@@ -1,0 +1,469 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Raydium RM692H0 dual-DSI OLED panel (Lenovo Xiaoxin Pad Pro 2022, TB138FC).
+ *
+ * 2560x1536 command-mode panel fed by two bonded DSI links (one 1280-column half each), with
+ * DSC compression. The stock panel node is named "... without DSC", but its timing nodes set
+ * qcom,compression-mode = "dsc" (one 1280x8 slice per link, 10 bpc, 8 bpp) and the bootloader
+ * drives it compressed; uncompressed frames show up as noise.
+ *
+ * Init sequence generated with linux-mdss-dsi-panel-driver-generator (--dumb-dcs) from the
+ * stock "qcom,mdss_dsi_dual_rm692h0_2k_cmd" node; driver structure follows
+ * panel-raydium-rm69380.c (dual DSI) and panel-raydium-rm692e5.c (DSC).
+ */
+
+#include <linux/backlight.h>
+#include <linux/delay.h>
+#include <linux/gpio/consumer.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_graph.h>
+#include <linux/regulator/consumer.h>
+
+#include <video/mipi_display.h>
+
+#include <drm/display/drm_dsc.h>
+#include <drm/display/drm_dsc_helper.h>
+#include <drm/drm_mipi_dsi.h>
+#include <drm/drm_modes.h>
+#include <drm/drm_panel.h>
+#include <drm/drm_probe_helper.h>
+
+/* stock timing@0 is 120 Hz, timing@1 60 Hz; the panel rate is set by page 0x40 reg 0xbd */
+static uint refresh = 120;
+module_param(refresh, uint, 0444);
+MODULE_PARM_DESC(refresh, "panel refresh rate in Hz: 120 (default) or 60");
+
+struct rm692h0_panel {
+	struct drm_panel panel;
+	struct mipi_dsi_device *dsi[2];
+	struct regulator_bulk_data supplies[3];
+	struct gpio_desc *reset_gpio;
+	struct drm_dsc_config dsc;
+};
+
+static inline struct rm692h0_panel *to_rm692h0_panel(struct drm_panel *panel)
+{
+	return container_of(panel, struct rm692h0_panel, panel);
+}
+
+static void rm692h0_reset(struct rm692h0_panel *ctx)
+{
+	/* stock qcom,mdss-dsi-reset-sequence = <1 10>, <0 10>, <1 10> */
+	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+	usleep_range(10000, 11000);
+	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	usleep_range(10000, 11000);
+	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+	usleep_range(10000, 11000);
+}
+
+static void rm692h0_set_lpm(struct rm692h0_panel *ctx, bool lpm)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ctx->dsi); i++) {
+		if (!ctx->dsi[i])
+			continue;
+		if (lpm)
+			ctx->dsi[i]->mode_flags |= MIPI_DSI_MODE_LPM;
+		else
+			ctx->dsi[i]->mode_flags &= ~MIPI_DSI_MODE_LPM;
+	}
+}
+
+/*
+ * Commands go out on DSI0; with qcom,sync-dual-dsi (and kernel/patches/0001) msm broadcasts
+ * them to both links, so both halves of the panel get initialized.
+ */
+static int rm692h0_on(struct rm692h0_panel *ctx)
+{
+	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi[0] };
+	struct drm_dsc_picture_parameter_set pps;
+
+	rm692h0_set_lpm(ctx, true);
+
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xa1);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xca, 0x80);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xcd, 0x08);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x42);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x32, 0xa5);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x34, 0x52);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x40, 0x52);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x42, 0xa5);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x40);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x61, 0x1c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x40);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x21, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x22, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x24, 0x2e);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x47, 0x22);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xd4);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x08, 0x04);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x94);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x48, 0x80);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xd4);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3d, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3f, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x94, 0x0f);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x97, 0x22);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x98, 0x22);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x99, 0x70);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9a, 0x90);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9b, 0x70);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9c, 0x90);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xd6);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x00, 0x15);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x01, 0x70);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x02, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x03, 0x08);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x04, 0x02);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x05, 0xe0);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x06, 0xff);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x07, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfa, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xd2);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4f, 0x08);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x50, 0x11);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x51, 0xab);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x52, 0x30);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x53, 0x06);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x54, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x55, 0x05);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x56, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x58, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x59, 0x08);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5a, 0x05);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5b, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5c, 0x02);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5d, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5e, 0x20);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5f, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x60, 0x03);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x61, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x62, 0x11);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x63, 0x0c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x64, 0x0d);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x65, 0xb7);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x66, 0x05);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x67, 0x53);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x68, 0x18);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x69, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6a, 0x10);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6b, 0xe0);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6c, 0x07);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6d, 0x10);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6e, 0x20);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6f, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x70, 0x06);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x71, 0x0f);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x72, 0x0f);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x73, 0x33);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x74, 0x0e);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x75, 0x1c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x76, 0x2a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x77, 0x38);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x78, 0x46);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x79, 0x54);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7a, 0x62);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7b, 0x69);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7c, 0x70);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7d, 0x77);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7e, 0x79);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7f, 0x7b);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x80, 0x7d);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x81, 0x7e);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x82, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x83, 0x02);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x84, 0x22);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x85, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x86, 0x2a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x87, 0x40);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x88, 0x2a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x89, 0xbe);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8a, 0x3a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8b, 0xfc);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8c, 0x3a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8d, 0xfa);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8e, 0x3a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8f, 0xf8);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x90, 0x3b);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x91, 0x38);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x92, 0x3b);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x93, 0x78);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x94, 0x3b);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x95, 0xb6);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x96, 0x4b);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x97, 0xf6);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x98, 0x4c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x99, 0x34);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9a, 0x4c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9b, 0x74);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9c, 0x5c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9d, 0x74);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9e, 0x8c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9f, 0xf4);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa2, 0x05);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa3, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa4, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa5, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa6, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa7, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa9, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xaa, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xa0, 0x80);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xd4);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x40, 0x03);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xfd);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x80, 0xf6);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xa0);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x06, 0x36);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6e, 0x07);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0xa1);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xc3, 0xff);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xc4, 0xff);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xc5, 0xff);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x72);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x42, 0x31);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x98);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x20, 0x03);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x53, 0x28);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x40);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xbd, 0x05);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfa, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xc2, 0x08);
+
+	/* stock timing-switch-command: 0xbd = 0x00 -> 120 Hz, 0x05 -> 60 Hz */
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x40);
+	if (refresh == 60)
+		mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xbd, 0x05);
+	else
+		mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xbd, 0x00);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfe, 0x00);
+
+	drm_dsc_pps_payload_pack(&pps, &ctx->dsc);
+	mipi_dsi_picture_parameter_set_multi(&dsi_ctx, &pps);
+	mipi_dsi_compression_mode_ext_multi(&dsi_ctx, true, MIPI_DSI_COMPRESSION_DSC, 0);
+
+	mipi_dsi_dcs_set_tear_on_multi(&dsi_ctx, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
+	mipi_dsi_dcs_exit_sleep_mode_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 120);
+	mipi_dsi_dcs_set_display_on_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 120);
+
+	return dsi_ctx.accum_err;
+}
+
+static void rm692h0_off(struct rm692h0_panel *ctx)
+{
+	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi[0] };
+
+	rm692h0_set_lpm(ctx, false);
+
+	mipi_dsi_dcs_set_display_off_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 70);
+	mipi_dsi_dcs_enter_sleep_mode_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 10);
+}
+
+static int rm692h0_prepare(struct drm_panel *panel)
+{
+	struct rm692h0_panel *ctx = to_rm692h0_panel(panel);
+	int ret;
+
+	ret = regulator_bulk_enable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
+	if (ret < 0)
+		return ret;
+
+	rm692h0_reset(ctx);
+
+	ret = rm692h0_on(ctx);
+	if (ret < 0) {
+		dev_err(&ctx->dsi[0]->dev, "Failed to initialize panel: %d\n", ret);
+		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+		regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
+	}
+
+	return ret;
+}
+
+static int rm692h0_unprepare(struct drm_panel *panel)
+{
+	struct rm692h0_panel *ctx = to_rm692h0_panel(panel);
+
+	rm692h0_off(ctx);
+
+	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
+
+	return 0;
+}
+
+/*
+ * Stock timings are per DSI link (1280x1536 each: hfp 32, hsync 12, hbp 38; vfp 16, vsync 4,
+ * vbp 12). msm divides horizontal timings by two in bonded mode, so the full-width mode
+ * carries twice the per-link values.
+ */
+#define RM692H0_HFP	(2 * 32)
+#define RM692H0_HSYNC	(2 * 12)
+#define RM692H0_HBP	(2 * 38)
+#define RM692H0_MODE(hz) {							.clock = (2560 + RM692H0_HFP + RM692H0_HSYNC + RM692H0_HBP) *			 (1536 + 16 + 4 + 12) * (hz) / 1000,				.hdisplay = 2560,							.hsync_start = 2560 + RM692H0_HFP,					.hsync_end = 2560 + RM692H0_HFP + RM692H0_HSYNC,			.htotal = 2560 + RM692H0_HFP + RM692H0_HSYNC + RM692H0_HBP,		.vdisplay = 1536,							.vsync_start = 1536 + 16,						.vsync_end = 1536 + 16 + 4,						.vtotal = 1536 + 16 + 4 + 12,						.width_mm = 245,							.height_mm = 146,							.type = DRM_MODE_TYPE_DRIVER,					}
+
+static const struct drm_display_mode rm692h0_mode_120 = RM692H0_MODE(120);
+static const struct drm_display_mode rm692h0_mode_60 = RM692H0_MODE(60);
+
+static int rm692h0_get_modes(struct drm_panel *panel, struct drm_connector *connector)
+{
+	return drm_connector_helper_get_modes_fixed(connector,
+						  refresh == 60 ? &rm692h0_mode_60 : &rm692h0_mode_120);
+}
+
+static const struct drm_panel_funcs rm692h0_panel_funcs = {
+	.prepare = rm692h0_prepare,
+	.unprepare = rm692h0_unprepare,
+	.get_modes = rm692h0_get_modes,
+};
+
+static int rm692h0_bl_update_status(struct backlight_device *bl)
+{
+	struct rm692h0_panel *ctx = bl_get_data(bl);
+	u16 brightness = backlight_get_brightness(bl);
+	int ret;
+
+	rm692h0_set_lpm(ctx, false);
+	ret = mipi_dsi_dcs_set_display_brightness_large(ctx->dsi[0], brightness);
+	rm692h0_set_lpm(ctx, true);
+
+	return ret < 0 ? ret : 0;
+}
+
+static const struct backlight_ops rm692h0_bl_ops = {
+	.update_status = rm692h0_bl_update_status,
+};
+
+static struct backlight_device *rm692h0_create_backlight(struct rm692h0_panel *ctx)
+{
+	struct device *dev = &ctx->dsi[0]->dev;
+	const struct backlight_properties props = {
+		.type = BACKLIGHT_RAW,
+		.brightness = 1023,
+		.max_brightness = 2047,	/* qcom,mdss-dsi-bl-max-level = <0x7ff> */
+	};
+
+	return devm_backlight_device_register(dev, dev_name(dev), dev, ctx,
+					      &rm692h0_bl_ops, &props);
+}
+
+static int rm692h0_probe(struct mipi_dsi_device *dsi)
+{
+	struct mipi_dsi_host *dsi_sec_host;
+	struct rm692h0_panel *ctx;
+	struct device *dev = &dsi->dev;
+	struct device_node *dsi_sec;
+	int ret, i;
+
+	ctx = devm_drm_panel_alloc(dev, struct rm692h0_panel, panel,
+				   &rm692h0_panel_funcs, DRM_MODE_CONNECTOR_DSI);
+	if (IS_ERR(ctx))
+		return PTR_ERR(ctx);
+
+	ctx->supplies[0].supply = "vddio";
+	ctx->supplies[1].supply = "vdd";
+	ctx->supplies[2].supply = "avdd";
+	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(ctx->supplies), ctx->supplies);
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "Failed to get regulators\n");
+
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio))
+		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
+				     "Failed to get reset-gpios\n");
+
+	dsi_sec = of_graph_get_remote_node(dsi->dev.of_node, 1, -1);
+	if (dsi_sec) {
+		const struct mipi_dsi_device_info info = { "RM692H0 DSI1", 0, dsi_sec };
+
+		dsi_sec_host = of_find_mipi_dsi_host_by_node(dsi_sec);
+		of_node_put(dsi_sec);
+		if (!dsi_sec_host)
+			return dev_err_probe(dev, -EPROBE_DEFER,
+					     "Cannot get secondary DSI host\n");
+
+		ctx->dsi[1] = devm_mipi_dsi_device_register_full(dev, dsi_sec_host, &info);
+		if (IS_ERR(ctx->dsi[1]))
+			return dev_err_probe(dev, PTR_ERR(ctx->dsi[1]),
+					     "Cannot get secondary DSI node\n");
+
+		mipi_dsi_set_drvdata(ctx->dsi[1], ctx);
+	}
+
+	ctx->dsi[0] = dsi;
+	mipi_dsi_set_drvdata(dsi, ctx);
+
+	ctx->panel.prepare_prev_first = true;
+
+	/* stock qcom,mdss-dsc-*: one 1280x8 slice per link, 10 bpc in, 8 bpp out */
+	ctx->dsc.dsc_version_major = 1;
+	ctx->dsc.dsc_version_minor = 1;
+	ctx->dsc.slice_height = 8;
+	ctx->dsc.slice_width = 1280;
+	ctx->dsc.slice_count = 1;
+	ctx->dsc.bits_per_component = 10;
+	ctx->dsc.bits_per_pixel = 8 << 4;	/* 4 fractional bits */
+	ctx->dsc.block_pred_enable = true;
+
+	ctx->panel.backlight = rm692h0_create_backlight(ctx);
+	if (IS_ERR(ctx->panel.backlight))
+		return dev_err_probe(dev, PTR_ERR(ctx->panel.backlight),
+				     "Failed to create backlight\n");
+
+	drm_panel_add(&ctx->panel);
+
+	for (i = 0; i < ARRAY_SIZE(ctx->dsi); i++) {
+		if (!ctx->dsi[i])
+			continue;
+
+		ctx->dsi[i]->dsc = &ctx->dsc;
+		ctx->dsi[i]->lanes = 4;
+		ctx->dsi[i]->format = MIPI_DSI_FMT_RGB888;
+		/* command mode, as stock (qcom,mdss-dsi-panel-type = "dsi_cmd_mode") */
+		ctx->dsi[i]->mode_flags = MIPI_DSI_CLOCK_NON_CONTINUOUS;
+
+		ret = devm_mipi_dsi_attach(dev, ctx->dsi[i]);
+		if (ret < 0) {
+			drm_panel_remove(&ctx->panel);
+			return dev_err_probe(dev, ret, "Failed to attach to DSI%d\n", i);
+		}
+	}
+
+	return 0;
+}
+
+static void rm692h0_remove(struct mipi_dsi_device *dsi)
+{
+	struct rm692h0_panel *ctx = mipi_dsi_get_drvdata(dsi);
+
+	drm_panel_remove(&ctx->panel);
+}
+
+static const struct of_device_id rm692h0_of_match[] = {
+	{ .compatible = "lenovo,tb138fc-rm692h0" },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, rm692h0_of_match);
+
+static struct mipi_dsi_driver rm692h0_panel_driver = {
+	.probe = rm692h0_probe,
+	.remove = rm692h0_remove,
+	.driver = {
+		.name = "panel-raydium-rm692h0",
+		.of_match_table = rm692h0_of_match,
+	},
+};
+module_mipi_dsi_driver(rm692h0_panel_driver);
+
+MODULE_DESCRIPTION("DRM driver for the Raydium RM692H0 dual-DSI DSC panel in the Lenovo TB138FC");
+MODULE_LICENSE("GPL");

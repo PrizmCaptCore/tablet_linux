@@ -1,0 +1,20 @@
+#!/bin/sh
+# Hand the factory speaker calibration to the CS35L43 driver (sysfs "calibration"), which
+# writes it into the speaker protection firmware (CAL_R/CAL_AMBIENT). Lenovo stores it as
+# ASCII numbers in persist/audio/spk_N_cal_r and spk_N_ambient; read with debugfs (read-only,
+# persist stays unmounted). Without it the protection firmware keeps the volume very low.
+P=/dev/disk/by-partlabel/persist
+[ -e "$P" ] || exit 0
+
+for map in "1 0041" "2 0042" "3 0043" "4 0040"; do
+	set -- $map
+	cal_r=$(debugfs -R "cat /audio/spk_$1_cal_r" "$P" 2>/dev/null | tr -cd '0-9')
+	ambient=$(debugfs -R "cat /audio/spk_$1_ambient" "$P" 2>/dev/null | tr -cd '0-9')
+	[ -n "$cal_r" ] && [ -n "$ambient" ] || { echo "SPK$1: no calibration in persist"; continue; }
+
+	attr=/sys/bus/i2c/devices/4-$2/calibration
+	for i in $(seq 1 60); do [ -e "$attr" ] && break; sleep 0.5; done
+	[ -e "$attr" ] || { echo "SPK$1: $attr missing"; continue; }
+	echo "$cal_r $ambient" > "$attr" && echo "SPK$1 (4-$2): CAL_R $cal_r, ambient $ambient"
+done
+exit 0

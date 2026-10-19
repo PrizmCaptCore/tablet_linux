@@ -1,0 +1,29 @@
+--- a/sound/soc/qcom/sm8250.c
++++ b/sound/soc/qcom/sm8250.c
+@@ -78,6 +78,7 @@
+ 	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
+ 	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
+ 	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
++	int i;
+ 
+ 	switch (cpu_dai->id) {
+ 	case PRIMARY_MI2S_RX:
+@@ -86,7 +87,17 @@
+ 			Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT,
+ 			MI2S_BCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
+ 		snd_soc_dai_set_fmt(cpu_dai, fmt);
+-		snd_soc_dai_set_fmt(codec_dai, codec_dai_fmt);
++		/*
++		 * Several amps can share the link (4x CS35L43 on the Lenovo
++		 * TB138FC); they run their PLL from BCLK, which is set up
++		 * through the component sysclk.
++		 */
++		for_each_rtd_codec_dais(rtd, i, codec_dai) {
++			snd_soc_component_set_sysclk(codec_dai->component, 0, 0,
++						     MI2S_BCLK_RATE,
++						     SND_SOC_CLOCK_IN);
++			snd_soc_dai_set_fmt(codec_dai, codec_dai_fmt);
++		}
+ 		break;
+ 	case SECONDARY_MI2S_RX:
+ 		codec_dai_fmt |= SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S;

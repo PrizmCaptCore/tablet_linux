@@ -1,0 +1,41 @@
+spmi_bus | qcom,pm8150@0 | qcom,spmi-pmic | status=- | reg=<0x00 0x00>
+spmi_bus | qcom,pm8150@1 | qcom,spmi-pmic | status=- | reg=<0x01 0x00>
+spmi_bus | qcom,pm8150b@2 | qcom,spmi-pmic | status=- | reg=<0x02 0x00>
+spmi_bus | qcom,pm8150b@3 | qcom,spmi-pmic | status=- | reg=<0x03 0x00>
+spmi_bus | qcom,pm8150l@4 | qcom,spmi-pmic | status=- | reg=<0x04 0x00>
+spmi_bus | qcom,pm8150l@5 | qcom,spmi-pmic | status=- | reg=<0x05 0x00>
+spmi_bus | qcom,pm8009@a | qcom,spmi-pmic | status=- | reg=<0x0a 0x00>
+spmi_bus | qcom,pm8009@b | qcom,spmi-pmic | status=- | reg=<0x0b 0x00>
+spmi_bus | qcom,pmxprairie@8 | qcom,spmi-pmic | status=- | reg=<0x08 0x00>
+spmi_bus | qcom,pmxprairie@9 | qcom,spmi-pmic | status=- | reg=<0x09 0x00>
+soc | display_gpio_regulator@1 | regulator-fixed | status=- | gpio=tlmm:61
+soc | qcom,wb-display@0 | qcom,wb-display | status=- | 
+soc | qcom,msm_notifier@0 | qcom,msm-notifier | status=- | 
+soc | gpio_regulator@0 | regulator-fixed | status=- | reg=<0x00 0x00>; gpio=tlmm:109
+soc | gpio_regulator@1 | regulator-fixed | status=- | reg=<0x01 0x00>; gpio=tlmm:144
+soc | gpio_regulator@2 | regulator-fixed | status=- | reg=<0x02 0x00>; gpio=tlmm:112
+q6core | lpi_pinctrl@33c0000 | qcom,lpi-pinctrl | status=- | reg=<0x33c0000 0x00>
+bolero | va-macro@3370000 | qcom,va-macro | status=- | reg=<0x3370000 0x00>; va-vdd-micb-supply=S4A
+bolero | tx-macro@3220000 | qcom,tx-macro | status=- | reg=<0x3220000 0x00>
+bolero | rx-macro@3200000 | qcom,rx-macro | status=- | reg=<0x3200000 0x00>
+soc | msm_cdc_pinctrl@32 | qcom,msm-cdc-pinctrl | status=- | 
+bolero_ar | va-macro-ar@3370000 | qcom,va-macro | status=- | reg=<0x3370000 0x00>; va-vdd-micb-supply=S4A
+bolero_ar | tx-macro-ar@3220000 | qcom,tx-macro | status=- | reg=<0x3220000 0x00>
+bolero_ar | rx-macro-ar@3200000 | qcom,rx-macro | status=- | reg=<0x3200000 0x00>
+qupv3_se4_i2c | cs35l43@40 | cirrus,cs35l43 | status=- | reg=<0x40>; VA-supply=S4A; interrupts=<0x44 0x08>; reset-gpios=tlmm:131
+qupv3_se4_i2c | cs35l43@41 | cirrus,cs35l43 | status=- | reg=<0x41>; VA-supply=S4A; interrupts=<0x44 0x08>; reset-gpios=tlmm:131
+qupv3_se4_i2c | cs35l43@42 | cirrus,cs35l43 | status=- | reg=<0x42>; VA-supply=S4A; interrupts=<0x44 0x08>; reset-gpios=tlmm:131
+qupv3_se4_i2c | cs35l43@43 | cirrus,cs35l43 | status=- | reg=<0x43>; VA-supply=S4A; interrupts=<0x44 0x08>; reset-gpios=tlmm:131
+qupv3_se0_spi | goodix-berlin@0 | goodix,gt9966S | status=- | reg=<0x00>; goodix,avdd-gpio=tlmm:108; goodix,reset-gpio=tlmm:38; goodix,irq-gpio=tlmm:39
+qupv3_se1_i2c | keyboard@60 | hid-over-i2c | status=- | reg=<0x60>; vdd-supply=vreg_l16a; vddl-supply=vreg_l8c; interrupts=<0x36 0x2002 0x81 0x2002>
+qupv3_se3_i2c | ptp@61 | hid-over-i2c | status=- | reg=<0x61>; vdd-supply=vreg_l16a; vddl-supply=vreg_l8c; interrupts=<0x0b 0x2002>
+qupv3_se13_i2c | redriver@19 | onnn,redriver | status=- | reg=<0x19>; vdd-supply=vreg_l16a
+qupv3_se13_i2c | ctn730@28 | nxp,ctn730 | status=- | reg=<0x28>; rst-gpios=tlmm:85; enable-gpios=tlmm:130; interrupt-gpios=tlmm:87
+qupv3_se3_i2c | redriver@19 | onnn,redriver | status=- | reg=<0x19>; vdd-supply=vreg_l16a
+qupv3_se1_i2c | ctn730@28 | nxp,ctn730 | status=- | reg=<0x28>; rst-gpios=tlmm:85; enable-gpios=tlmm:130; interrupt-gpios=tlmm:87
+soc | goodix_fp | goodix,fingerprint | status=- | vdd-supply=vreg_l10c; fp-gpio-irq=tlmm:23; fp-gpio-reset=tlmm:22
+qupv3_se15_i2c | qcom,smb1396@34 | qcom,i2c-pmic | status=- | reg=<0x34>; interrupts=<0x02 0xc5 0x00 0x08>
+qupv3_se15_i2c | qcom,smb1396@35 | qcom,i2c-pmic | status=- | reg=<0x35>
+qupv3_se15_i2c | qcom,smb1398@36 | qcom,i2c-pmic | status=- | reg=<0x36>
+qupv3_se3_i2c | bq27541@55 | ti,bq27541 | status=- | reg=<0x55>
+qupv3_se15_i2c | bq27541@55 | ti,bq27541 | status=- | reg=<0x55>

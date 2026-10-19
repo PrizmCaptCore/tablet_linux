@@ -1,0 +1,14 @@
+[Unit]
+Description=Set Bluetooth/Wi-Fi addresses from the fpinfo partition
+# the script exits quietly without fpinfo, so wait for its device node (raced at boot)
+Requires=dev-disk-by\x2dpartlabel-fpinfo.device
+After=dev-disk-by\x2dpartlabel-fpinfo.device local-fs.target
+Before=bluetooth.service NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/tb138fc-macs
+
+[Install]
+WantedBy=multi-user.target

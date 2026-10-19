@@ -1,0 +1,47 @@
+#!/bin/sh
+# TB138FC initramfs: switch to the Arch root on PARTLABEL=userdata, or fall back to a
+# debug shell (USB NCM 172.16.42.1 + telnet) if that fails or "tb.debug" is on the cmdline.
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev
+mkdir -p /dev/pts /sys/kernel/config /tmp /newroot
+mount -t devpts devpts /dev/pts; mount -t configfs none /sys/kernel/config
+mount -t debugfs none /sys/kernel/debug 2>/dev/null
+step() { echo "tb138fc: $*" > /dev/kmsg; }
+step "initramfs started"
+
+find_part() {
+  for u in /sys/class/block/*/uevent; do
+    grep -q "^PARTNAME=$1\$" "$u" && { echo /dev/$(basename $(dirname $u)); return; }
+  done
+}
+
+if ! grep -q tb.debug /proc/cmdline; then
+  root=""
+  i=0; while [ -z "$root" ] && [ $i -lt 20 ]; do root=$(find_part userdata); [ -z "$root" ] && sleep 0.5; i=$((i+1)); done
+  step "root partition: [$root]"
+  if [ -n "$root" ] && mount -t ext4 -o rw "$root" /newroot && [ -x /newroot/sbin/init ]; then
+    step "switching to Arch on $root"
+    umount /sys/kernel/debug 2>/dev/null; umount /sys/kernel/config /dev/pts
+    mount --move /dev /newroot/dev; mount --move /proc /newroot/proc; mount --move /sys /newroot/sys
+    exec switch_root /newroot /sbin/init
+  fi
+  step "root mount failed, falling back to debug shell"
+  umount /newroot 2>/dev/null
+fi
+
+# ---- debug shell ----
+(
+  G=/sys/kernel/config/usb_gadget/g1
+  i=0; while [ -z "$(ls /sys/class/udc 2>/dev/null)" ] && [ $i -lt 40 ]; do sleep 1; i=$((i+1)); done
+  U=$(ls /sys/class/udc 2>/dev/null | head -1); [ -z "$U" ] && exit
+  mkdir -p $G && cd $G
+  echo 0x1d6b > idVendor; echo 0x0103 > idProduct
+  mkdir -p strings/0x409 functions/ncm.usb0 configs/c.1/strings/0x409
+  echo TB138FC > strings/0x409/serialnumber; echo "TB138FC Linux" > strings/0x409/product
+  echo 02:7b:13:8f:c0:01 > functions/ncm.usb0/dev_addr; echo 02:7b:13:8f:c0:02 > functions/ncm.usb0/host_addr
+  ln -s functions/ncm.usb0 configs/c.1/; echo "$U" > UDC && step "gadget bound to $U"
+  sleep 2; ip link set usb0 up; ip addr add 172.16.42.1/24 dev usb0
+  printf 'start 172.16.42.2\nend 172.16.42.2\ninterface usb0\noption subnet 255.255.255.0\nmax_leases 1\nlease_file /tmp/l\n' > /tmp/u.conf
+  touch /tmp/l; busybox-extras udhcpd /tmp/u.conf; busybox-extras telnetd -l /bin/sh -p 23 && step "telnetd up"
+) &
+while true; do sleep 3600; done

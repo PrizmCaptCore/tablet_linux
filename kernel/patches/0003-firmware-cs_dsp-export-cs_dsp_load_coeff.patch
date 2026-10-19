@@ -1,0 +1,30 @@
+--- a/drivers/firmware/cirrus/cs_dsp.c
++++ b/drivers/firmware/cirrus/cs_dsp.c
+@@ -2214,7 +2214,7 @@
+ 	return ret;
+ }
+ 
+-static int cs_dsp_load_coeff(struct cs_dsp *dsp, const struct firmware *firmware,
++int cs_dsp_load_coeff(struct cs_dsp *dsp, const struct firmware *firmware,
+ 			     const char *file)
+ {
+ 	LIST_HEAD(buf_list);
+@@ -2428,6 +2428,7 @@
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(cs_dsp_load_coeff);
+ 
+ static int cs_dsp_create_name(struct cs_dsp *dsp)
+ {
+--- a/include/linux/firmware/cirrus/cs_dsp.h
++++ b/include/linux/firmware/cirrus/cs_dsp.h
+@@ -261,6 +261,8 @@
+ int cs_dsp_read_data_word(struct cs_dsp *dsp, int mem_type, unsigned int mem_addr, u32 *data);
+ int cs_dsp_write_data_word(struct cs_dsp *dsp, int mem_type, unsigned int mem_addr, u32 data);
+ void cs_dsp_remove_padding(u32 *buf, int nwords);
++int cs_dsp_load_coeff(struct cs_dsp *dsp, const struct firmware *firmware,
++			     const char *file);
+ 
+ struct cs_dsp_alg_region *cs_dsp_find_alg_region(struct cs_dsp *dsp,
+ 						 int type, unsigned int id);

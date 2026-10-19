@@ -1,0 +1,13 @@
+[Unit]
+Description=Load the speaker amp calibration from the persist partition
+Requires=dev-disk-by\x2dpartlabel-persist.device
+After=dev-disk-by\x2dpartlabel-persist.device
+Before=sound.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/tb138fc-spk-cal
+
+[Install]
+WantedBy=multi-user.target
