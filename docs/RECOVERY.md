@@ -36,7 +36,7 @@ The rawprogram files leave `persist`, `fpinfo`, `frp`, `devinfo`, `modemst*`, `f
 
 ## Device-unique partitions
 
-`backup/` holds EDL dumps taken before any write (checksums in `backup/SHA256SUMS`):
+EDL dumps taken before any write are kept **outside the repo** (`$BACKUP` in env.sh, checksums in `SHA256SUMS`; never commit them):
 `persist` (Wi-Fi/sensor calibration), `fpinfo` (Lenovo SN `<device serial>`, Wi-Fi/BT MACs),
 `frp` (last byte `01` = OEM unlock allowed), `devinfo`, `modemst1/2`, `fsg`, `fsc`.
 Restore one with: `edl.py w <partition> <file> --memory=ufs --loader=...prog_firehose_ddr.elf`.

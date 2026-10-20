@@ -23,7 +23,7 @@ Pad Pro 12.6 (Q706F) ports.
 | Sensors (SLPI: ICM4x6xx accel, AK0991x compass, light) | ✅ | hexagonrpcd (+registry write patches) → libssc → iio-sensor-proxy; auto-rotate verified |
 | Speakers (4× CS35L43, ADSP) | ✅ | vendored CS35L43 driver + factory calibration, primary MI2S, UCM `rootfs/ucm2/`; stereo verified |
 | Charging (PM8150B SMB5 main charger) | ✅ | qcom_smbx + SMB5 series (kernel/patches 0004-0013): 4.45 V float, 2.4 A; input follows Type-C/PD (5 V, up to 3 A) via `tb138fc-usb-icl`; no fast charge (SMB1396/1398 charge pumps) |
-| USB-C (PM8150B TCPM, NB7VPQ904M redriver) | ✅ | dual role: device (NCM debug) / host + OTG VBUS (USB-C earphones verified); PD sink 5 V; DP alt mode TODO |
+| USB-C (PM8150B TCPM, NB7VPQ904M redriver) | ✅ | dual role: device (NCM debug) / host + OTG VBUS (USB-C earphones verified); PD sink 5 V; DP alt mode (external monitor) verified: 4K30 over a 2-lane USB-C/HDMI hub, repeated plug/unplug OK |
 | RTC / clock | ✅ | PM8150 RTC is read-only: `tb138fc-rtc` keeps the offset (clock was 1970 until NTP -> HTTPS errors) |
 | Microphone (WCD938x analog, amic1) | ✅ | WCD938x on SoundWire + TX macro, UCM "Mic"; verified in GNOME |
 
@@ -45,7 +45,6 @@ rootfs/                   mkrootfs.sh (Arch Linux ARM + GNOME image → out/root
                           tb138fc-macs(.service) (BT/Wi-Fi addresses from fpinfo)
 tools/                    deploy.sh, tssh.py/tput.py (ssh/sftp), tsh.py/tpush.py (initramfs),
                           firmware extract/package, disp-regdump.sh, gpu-check.sh, devmap.py, ...
-backup/                   device-unique partitions read over EDL — keep safe (SHA256SUMS)
 docs/                     hardware notes, stock device map, decompiled stock DT
 logs/                     notable logs (UEFI/abl log, first Linux boot log, GPT dump, display
                           register dumps: bootloader vs msm in logs/regs/)

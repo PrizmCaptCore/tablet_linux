@@ -16,7 +16,7 @@ source "$(dirname "$(readlink -f "$0")")/../env.sh"
 IMAGES=${1:?path to the extracted ZUI firmware image/ directory}
 V=$WORK/stock-fw/tmp/vendor-root
 [ -d "$V/etc/sensors" ] || { echo "run tools/extract-firmware.sh first"; exit 1; }
-PERSIST=$REPO/backup/persist.img
+PERSIST=$BACKUP/persist.img   # env.sh; EDL dump of the persist partition
 T=$WORK/hexagonfs-root
 D=$T/usr/share/qcom/sm8250/Lenovo/TB138FC
 rm -rf "$T" && mkdir -p "$D"/{dsp,sensors/config,socinfo,acdb}   # sensors/registry is created by rdump

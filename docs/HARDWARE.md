@@ -20,8 +20,8 @@ PMIC regulators `pm8150_lN` → `vreg_lNa`, `pm8150a_lN` → `vreg_lNc`.
 | Fuel gauge | TI **bq27541** | i2c15 @0x55 | ✅ (8000 mAh design) |
 | Sensors | **ICM4x6xx** accel/gyro (SSC SPI 3, DRI gpio123), **AK0991x** compass (SSC I2C 1), **MN29xxx** light (SSC I2C 5), hall; registry also lists absent BMI3x0/QMI8658/MMC56x3x | owned by the SLPI | ✅ hexagonrpcd + libssc + iio-sensor-proxy, mount matrix `0,1,0;-1,0,0;0,0,1` |
 | Charger | PM8150B SMB5 + **SMB1396** ×2 (@0x34/0x35) + **SMB1398** (@0x36); battery L22D2P31 8000 mAh, stock float 4.485 V | SMB5 on SPMI sid 2 @0x1000; charge pumps i2c15 | ✅ SMB5 main charger (4.45 V / 2.4 A, AICL); charge pumps and Type-C PD TODO |
-| Wi-Fi / BT | QCA6390 (PCIe0 / UART6) | PMU from PM8150 s6a; wlan-en gpio20, bt-en gpio21, bt-sw-ctrl gpio124; calibration in `backup/persist.img`; MACs in fpinfo (+0xa0 BT, +0xc0 Wi-Fi) | ✅ stock linux-firmware; addresses set by `tb138fc-macs` |
-| USB-C | dwc3 + QMP combo PHY, onnn NB7VPQ904M redriver @0x19 (i2c13, vcc l16a 3.0-3.3 V as stock), PM8150B Type-C/PD PHY, DP alt mode | | ✅ dual role + PD sink 5 V + OTG VBUS (1.5 A); DP alt mode TODO; USB 3 untested (only a USB 2 cable so far) |
+| Wi-Fi / BT | QCA6390 (PCIe0 / UART6) | PMU from PM8150 s6a; wlan-en gpio20, bt-en gpio21, bt-sw-ctrl gpio124; calibration in the persist partition; MACs in fpinfo (+0xa0 BT, +0xc0 Wi-Fi) | ✅ stock linux-firmware; addresses set by `tb138fc-macs` |
+| USB-C | dwc3 + QMP combo PHY, onnn NB7VPQ904M redriver @0x19 (i2c13, vcc l16a 3.0-3.3 V as stock), PM8150B Type-C/PD PHY, DP alt mode | | ✅ dual role + PD sink 5 V + OTG VBUS (1.5 A) + DP alt mode (SBU/AUX via FSA4480 @0x43 on i2c15, stock qcom,dp-aux-switch); USB 3 untested (only a USB 2 cable so far) |
 | Buttons | power (PON), volume down (PON resin), volume up (pm8150 gpio6) | | ✅ |
 | Other | NXP CTN730 (pen charger) @0x28, Goodix fingerprint (vdd `l10c`), Airoha GPS, cameras | | low priority |
 

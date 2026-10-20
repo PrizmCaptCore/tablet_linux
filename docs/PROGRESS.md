@@ -202,6 +202,18 @@ explained hours of noise/mirroring experiments.
   `tb138fc-bt-addr.service`, started from udev on every hci0 add (tb138fc-macs bt|wifi).
 - BT_RFCOMM / BT_BNEP were missing (bluetoothd: RFCOMM server failed) -> HFP/HSP and PAN enabled.
 
+### DP alt mode (external monitor)
+- mdss_dp + QMP combo PHY + connector altmodes as on the RB5 (data-lanes 0-3 for DP-only
+  adapters). TCPM entered DP mode and the HPD Attention reached msm_dp, but every DPCD read
+  timed out (AUX -110): the AUX channel runs over the USB-C SBU pins, which this board routes
+  through an FSA4480 (i2c15 @0x43, ID 0xf1; stock qcom,dp-aux-switch), not the redriver as on
+  the RB5. Connector SBU endpoint -> fcs,fsa4480 node fixed it.
+- Verified with a VIA/Terminus USB-C hub (pin assignment D, 2 lanes HBR2): 3840x2160@30,
+  3 adapter attaches + 2 PC re-attaches in one boot, link training OK each time, no AUX errors.
+  4K60 needs a 4-lane (pin assignment C) adapter; SM8250 DP tops out around 4K60.
+- Debug: `echo 0x106 > /sys/module/drm/parameters/debug` (driver+KMS+DP) and the TCPM log in
+  /sys/kernel/debug/usb/tcpm-*/log; test without the USB link via Wi-Fi (TB_HOST).
+
 ## Next
 2. Audio input: microphones (WCD938x / VA macro DMICs), USB-C headset.
 3. Charging: PM8150B Type-C/TCPM for 3 A / PD input (watch the usb0 debug link), JEITA/step

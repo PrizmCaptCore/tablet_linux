@@ -13,3 +13,6 @@ DTS_NAME=sm8250-lenovo-tb138fc
 ALPINE_BRANCH=v3.24
 export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
 mkdir -p "$OUT"
+# EDL dumps of the device-unique partitions (persist, fpinfo, modemst, ...). Kept OUTSIDE the
+# repo: they hold the serial, MACs, calibration and EFS data.
+BACKUP=${BACKUP:-/mnt/e/windows_project/secrets/tb138fc-backup}
