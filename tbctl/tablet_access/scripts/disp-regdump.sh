@@ -1,9 +1,18 @@
 #!/bin/sh
 # On the tablet (root): dump display-path registers (DPU blocks, DSI controllers, DSI PHY/PLL).
-#   sh disp-regdump.sh OUTFILE
+#   sh disp-regdump.sh OUTFILE      (from the PC: tbctl debug regs)
 # Offsets: DPU blocks from dpu_6_0_sm8250.h relative to the mdp region at 0xae01000.
 # Do not add the DSC blocks (0xae80000): reading them while unclocked crashed the tablet.
 OUT=${1:-/tmp/disp-regs.txt}
+# Reading a powered-down block hangs the bus and resets the tablet (it did, with the screen
+# blanked by the idle timeout): only dump while every block is runtime-active.
+for dev in ae00000.display-subsystem ae01000.display-controller ae94000.dsi ae96000.dsi; do
+  status=$(cat /sys/bus/platform/devices/$dev/power/runtime_status 2>/dev/null)
+  if [ "$status" != active ]; then
+    echo "refusing: $dev is '${status:-unknown}' (screen off?); turn the screen on and retry" >&2
+    exit 2
+  fi
+done
 /usr/local/bin/regdump \
   mdp_top:0xae01000:0x494 \
   ctl0:0xae02000:0x1e0 ctl1:0xae02200:0x1e0 \

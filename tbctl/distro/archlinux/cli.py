@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from tbctl.core.config import load
 from tbctl.distro.archlinux import fonts
 from tbctl.distro.archlinux.build import build
 from tbctl.distro.archlinux.config import ImageConfig
@@ -21,7 +22,8 @@ def _build(args: argparse.Namespace) -> None:
     build(ImageConfig(
         output=args.output.resolve(),
         sparse=args.sparse.resolve() if args.sparse else None,
-        size=args.size, label=args.label, cache=args.cache, hostname=args.hostname,
+        size=args.size, label=args.label, cache=args.cache or load().work / "dl",
+        hostname=args.hostname,
         locale=args.locale, timezone=args.timezone, fonts=args.fonts,
         packages=args.packages, services=args.services, drop_kernel=args.drop_kernel,
         overlays=resolve(args.overlays), overlay_tars=resolve(args.overlay_tars),
@@ -38,7 +40,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     b.add_argument("--sparse", type=Path, help="also write an Android sparse image (fastboot)")
     b.add_argument("--size", default=defaults.size)
     b.add_argument("--label", default=defaults.label, help="ext4 filesystem label")
-    b.add_argument("--cache", type=Path, default=defaults.cache, help="download cache")
+    b.add_argument("--cache", type=Path, help="download cache (default: <work>/dl)")
     b.add_argument("--hostname", default=defaults.hostname)
     b.add_argument("--locale", default=defaults.locale, help="system LANG")
     b.add_argument("--timezone", default=defaults.timezone)
@@ -56,8 +58,8 @@ def register(sub: argparse._SubParsersAction) -> None:
                    help="extract a tarball into / (repeatable)")
     b.add_argument("--chroot-script", dest="chroot_scripts", action="append", type=Path,
                    default=[], help="run a shell script inside the image (repeatable)")
-    b.set_defaults(func=_build)
+    b.set_defaults(func=_build, runs_on="linux", root=True)
 
     i = cmds.add_parser("inspect", help="summarize an image (Linux, root)")
     i.add_argument("image", type=Path)
-    i.set_defaults(func=lambda args: inspect(args.image.resolve()))
+    i.set_defaults(func=lambda args: inspect(args.image.resolve()), runs_on="linux", root=True)

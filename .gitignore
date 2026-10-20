@@ -13,3 +13,6 @@ logs/*.log
 # Python packaging byproducts
 build/
 *.egg-info/
+
+# per-machine tbctl settings (template: config.example.toml)
+config.toml

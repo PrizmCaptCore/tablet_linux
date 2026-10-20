@@ -43,8 +43,9 @@ initramfs/                init (switch to Arch, or debug shell), helper sources,
 rootfs/                   mkrootfs.sh (Arch Linux ARM + GNOME image → out/rootfs.simg),
                           customize.sh (fonts), install-qbootctl.sh (A/B slot success),
                           tb138fc-macs(.service) (BT/Wi-Fi addresses from fpinfo)
-tools/                    deploy.sh, tssh.py/tput.py (ssh/sftp), tsh.py/tpush.py (initramfs),
-                          firmware extract/package, disp-regdump.sh, gpu-check.sh, devmap.py, ...
+tbctl/                    Python tooling (pip install -e .): rootfs image, tablet access
+                          (ssh, fastboot, rescue shell, debug helpers), host checks
+tools/                    remaining WSL build scripts (being moved into tbctl)
 docs/                     hardware notes, stock device map, decompiled stock DT
 logs/                     notable logs (UEFI/abl log, first Linux boot log, GPT dump, display
                           register dumps: bootloader vs msm in logs/regs/)
@@ -83,13 +84,18 @@ From Windows, always run WSL scripts as files (`wsl -d Ubuntu-26.04 -- bash /mnt
 After an interrupted rootfs build: `sudo bash tools/loop-cleanup.sh` (or `wsl --shutdown`);
 check an image with `sudo bash tools/inspect-rootfs.sh`.
 
-## Deploy (Windows, Git Bash)
+## Deploy and access (Windows or Linux)
+
+`pip install -e .` once, then (`python -m tbctl` works where the `tbctl` script is not on PATH):
 
 ```bash
-bash tools/deploy.sh                   # reboot to fastboot if needed, flash boot_a, boot
-fastboot flash userdata out/rootfs.simg   # root filesystem (wipes userdata)
-python tools/tssh.py 'uptime'          # Arch over ssh (alarm/alarm); TB_HOST=<wifi ip> to use Wi-Fi
-python tools/tsh.py 'dmesg | tail'     # debug shell over USB (initramfs fallback)
+tbctl flash boot                       # reboot to fastboot if needed, flash boot_a, wait for ssh
+tbctl flash rootfs --wipe-userdata     # out/rootfs.simg -> userdata (replaces the whole system)
+tbctl run 'uptime'                     # Arch over ssh (--root: through sudo); TB_HOST=<wifi ip>
+tbctl push FILE... DIR / tbctl pull REMOTE [LOCAL] / tbctl shell
+tbctl reboot [--bootloader]            # waits until the tablet is back
+tbctl rescue run 'dmesg | tail'        # debug shell over USB (initramfs fallback, telnet)
+tbctl debug regs | gpu                 # display register dump (screen must be on), GPU check
 ```
 
 Boot flow: abl → kernel + initramfs → mounts `PARTLABEL=userdata` and `switch_root`s into

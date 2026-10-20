@@ -20,10 +20,12 @@ from tbctl.distro.archlinux.config import (ALARM_URL, BASE_PACKAGES, BASE_SERVIC
 from tbctl.distro.archlinux.pacman import relaxed_pacman
 
 
+REQUIRED_TOOLS = ("mkfs.ext4", "e2fsck", "bsdtar", "mount", "umount", "chroot", "unshare",
+                  "truncate", "img2simg")
+
+
 def check(cfg: ImageConfig) -> None:
-    tools = ["mkfs.ext4", "e2fsck", "bsdtar", "mount", "umount", "chroot", "unshare", "truncate"]
-    if cfg.sparse:
-        tools.append("img2simg")
+    tools = [t for t in REQUIRED_TOOLS if cfg.sparse or t != "img2simg"]
     problems = host.require_linux_root() + host.require_tools(tools) + host.require_aarch64_exec()
     unknown = [f for f in cfg.fonts if f not in fonts.INSTALLERS]
     if unknown:

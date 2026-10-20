@@ -25,7 +25,7 @@ class ImageConfig:
     sparse: Path | None = None        # also write an Android sparse image (fastboot)
     size: str = "16G"
     label: str = "rootfs"
-    cache: Path = Path.home() / ".cache" / "tbctl"
+    cache: Path = Path.home() / ".cache" / "tbctl"   # downloads (base tarball, fonts)
     hostname: str = "alarm"
     locale: str = "en_US.UTF-8"       # LANG; en_US.UTF-8 is always generated as well
     timezone: str = "UTC"

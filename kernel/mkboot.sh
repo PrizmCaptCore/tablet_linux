@@ -1,6 +1,6 @@
 #!/bin/bash
 # Package kernel + DTB + initramfs into an Android boot image (header v2) for boot_a.
-# Lenovo's abl removed `fastboot boot`, so the image is flashed (tools/deploy.sh).
+# Lenovo's abl removed `fastboot boot`, so the image is flashed (tbctl flash boot).
 #   bash kernel/mkboot.sh
 set -eo pipefail
 source "$(dirname "$(readlink -f "$0")")/../env.sh"

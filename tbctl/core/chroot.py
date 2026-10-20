@@ -8,7 +8,7 @@ import shutil
 import signal
 from pathlib import Path
 
-from tbctl.core.process import run, run_quiet
+from tbctl.core.process import BuildError, run, run_quiet
 
 KERNEL_FS = ("proc", "sys", "dev", "dev/pts")
 
@@ -17,6 +17,8 @@ KERNEL_FS = ("proc", "sys", "dev", "dev/pts")
 def loop_mounted(image: Path, mountpoint: Path, readonly: bool = False):
     # noload: a read-only mount must not replay the ext4 journal into the image
     opts = "loop,ro,noload" if readonly else "loop"
+    if not image.is_file():
+        raise BuildError(f"no such image: {image}")
     mountpoint.mkdir(parents=True, exist_ok=True)
     run(["mount", "-o", opts, str(image), str(mountpoint)])
     try:

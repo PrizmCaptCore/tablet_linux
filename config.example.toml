@@ -1,0 +1,25 @@
+# tbctl settings. Copy to config.toml (ignored by git) and adjust; every key is optional.
+#
+# [build] paths are on the Linux side (inside WSL on Windows): relative paths are relative to
+# the repository, "~" is the home of the (non-root) user who runs the build.
+
+[build]
+# Linux-native work directory: kernel tree, staging trees, raw images, download cache.
+# Keep it off /mnt/<drive> under WSL; building there is much slower.
+work = "~/tb138fc"
+# Build outputs that get flashed (boot.img, rootfs.simg, ...).
+out = "out"
+# EDL dumps of the device-unique partitions (persist, fpinfo, ...). Never commit these:
+# they hold the serial number, MACs, calibration and modem EFS data.
+backup = "backup"
+# The extracted stock ZUI QFIL package (its image/ directory).
+stock_firmware = ""
+
+[wsl]
+# Distribution that runs the build steps when tbctl is started on Windows ("" = default).
+distro = ""
+
+[tablet]
+host = "172.16.42.1"      # USB NCM gadget address; TB_HOST=<Wi-Fi IP> overrides it once
+user = "alarm"            # password: TB_PASS environment variable (default "alarm")
+fastboot = ""             # "" = fastboot on PATH, else the Android SDK platform-tools copy

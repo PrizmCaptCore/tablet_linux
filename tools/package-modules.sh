@@ -1,6 +1,6 @@
 #!/bin/bash
 # WSL: install the built kernel modules into a tarball ($OUT/modules-<kver>.tar.gz) for pushing
-# to a running tablet (tools/tput.py + tar -C /), instead of rebuilding the whole rootfs.
+# to a running tablet (tbctl push + tar -C /), instead of rebuilding the whole rootfs.
 set -eo pipefail
 source "$(dirname "$(readlink -f "$0")")/../env.sh"
 KVER=$(make -s -C "$KERNEL" kernelrelease)

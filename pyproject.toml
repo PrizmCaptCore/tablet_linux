@@ -7,8 +7,8 @@ name = "tbctl"
 version = "0.1.0"
 description = "Build and maintenance tooling for mainline Linux on the Lenovo TB138FC"
 license = "GPL-2.0-only"
-requires-python = ">=3.10"
-dependencies = []
+requires-python = ">=3.11"   # tomllib
+dependencies = ["paramiko"]   # tablet ssh/sftp
 
 [project.scripts]
 tbctl = "tbctl.cli:main"
@@ -18,3 +18,4 @@ include = ["tbctl*"]
 
 [tool.setuptools.package-data]
 "tbctl.distro.archlinux" = ["data/*/*"]
+"tbctl.tablet_access" = ["scripts/*"]
