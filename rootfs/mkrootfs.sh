@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build the Arch Linux ARM + GNOME root filesystem for the TB138FC (run as root in WSL):
 #   sudo bash rootfs/mkrootfs.sh
-# Needs the kernel built first (kernel/buildkernel.sh) for modules_install.
+# Needs the kernel built first (tbctl kernel build) for modules_install.
 # Output: $OUT/rootfs.simg (Android sparse image, flashed to the userdata partition).
 set -eo pipefail
 # Run in a private mount namespace: under WSL, systemd services copy our loop/bind mounts

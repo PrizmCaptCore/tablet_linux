@@ -7,10 +7,15 @@ from pathlib import Path
 
 from tbctl.core import host
 from tbctl.core.config import CONFIG_FILE, load
+from tbctl.device.tb138fc import bootimg, initramfs, kernel, panel
 from tbctl.distro.archlinux.build import REQUIRED_TOOLS as ROOTFS_TOOLS
 
 # build step -> host tools it runs; each step module owns its list
 STEPS = {
+    "kernel": kernel.REQUIRED_TOOLS,
+    "initramfs": initramfs.REQUIRED_TOOLS,
+    "bootimg": bootimg.REQUIRED_TOOLS,
+    "panel": panel.REQUIRED_TOOLS,
     "rootfs": ROOTFS_TOOLS,
 }
 
