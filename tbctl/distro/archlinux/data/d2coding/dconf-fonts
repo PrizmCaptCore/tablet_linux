@@ -1,0 +1,7 @@
+[org/gnome/desktop/interface]
+font-name='D2Coding 11'
+document-font-name='D2Coding 11'
+monospace-font-name='D2Coding 11'
+
+[org/gnome/desktop/wm/preferences]
+titlebar-font='D2Coding Bold 11'

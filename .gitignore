@@ -9,3 +9,7 @@ backup/
 secrets/
 logs/*.log
 *.img
+
+# Python packaging byproducts
+build/
+*.egg-info/

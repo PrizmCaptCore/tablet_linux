@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tbctl"
+version = "0.1.0"
+description = "Build and maintenance tooling for mainline Linux on the Lenovo TB138FC"
+license = "GPL-2.0-only"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+tbctl = "tbctl.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tbctl*"]
+
+[tool.setuptools.package-data]
+"tbctl.distro.archlinux" = ["data/*/*"]
