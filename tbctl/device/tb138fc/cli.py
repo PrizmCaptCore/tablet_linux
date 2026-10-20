@@ -10,13 +10,17 @@
     tbctl kernel config SYM...         values of kernel config symbols (Linux)
     tbctl initramfs                    out/initramfs.cpio.gz (Linux)
     tbctl bootimg                      out/boot.img from the kernel tree + initramfs (Linux)
+    tbctl firmware extract             stock QFIL package -> <work>/stock-fw (Linux)
+    tbctl firmware stock-dt            stock DTBs -> <work>/stock, docs/stock-dt (Linux)
+    tbctl firmware package             out/firmware-tb138fc.tar.gz (Linux)
+    tbctl firmware hexagonfs           out/hexagonfs-tb138fc.tar.gz, SLPI sensor files (Linux)
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from tbctl.device.tb138fc import bootimg, dts, initramfs, kernel, panel
+from tbctl.device.tb138fc import bootimg, dts, firmware, initramfs, kernel, panel
 
 
 def _dts(args: argparse.Namespace) -> None:
@@ -63,6 +67,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     b = sub.add_parser("bootimg", help="build out/boot.img")
     b.add_argument("--tree", type=Path, help="kernel tree (default: <work>/linux)")
     b.set_defaults(func=lambda a: bootimg.build(_tree(a)) and None, runs_on="linux")
+
+    f = sub.add_parser("firmware", help="proprietary files from the stock firmware")
+    fcmds = f.add_subparsers(dest="command", required=True)
+    for name, help_, func in (("extract", "unpack the stock QFIL package", firmware.extract),
+                              ("stock-dt", "split and decompile the stock DTBs", firmware.stock_dt),
+                              ("package", "remoteproc/zap/amp firmware tarball", firmware.package),
+                              ("hexagonfs", "SLPI sensor file tree tarball", firmware.hexagonfs)):
+        fc = fcmds.add_parser(name, help=help_)
+        fc.set_defaults(func=lambda a, func=func: print(func()), runs_on="linux")
 
     c = kcmds.add_parser("config", help="show kernel config symbols")
     c.add_argument("--tree", type=Path, help="kernel tree (default: <work>/linux)")

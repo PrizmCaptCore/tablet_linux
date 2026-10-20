@@ -19,7 +19,7 @@ Pad Pro 12.6 (Q706F) ports.
 | Arch Linux ARM + GNOME | ✅ | GDM, touch login, D2Coding everywhere |
 | Wi-Fi (QCA6390, ath11k) | ✅ | stock linux-firmware board-2.bin; NTP time sync |
 | Bluetooth (QCA6390) | ✅ | power on + scan verified; BD address from fpinfo (`tb138fc-macs`) |
-| Remoteprocs (ADSP, CDSP, SLPI) | ✅ | stock firmware (`tools/package-firmware.sh`) |
+| Remoteprocs (ADSP, CDSP, SLPI) | ✅ | stock firmware (`tbctl firmware package`) |
 | Sensors (SLPI: ICM4x6xx accel, AK0991x compass, light) | ✅ | hexagonrpcd (+registry write patches) → libssc → iio-sensor-proxy; auto-rotate verified |
 | Speakers (4× CS35L43, ADSP) | ✅ | vendored CS35L43 driver + factory calibration, primary MI2S, UCM `rootfs/ucm2/`; stereo verified |
 | Charging (PM8150B SMB5 main charger) | ✅ | qcom_smbx + SMB5 series (kernel/patches 0004-0013): 4.45 V float, 2.4 A; input follows Type-C/PD (5 V, up to 3 A) via `tb138fc-usb-icl`; no fast charge (SMB1396/1398 charge pumps) |
@@ -71,9 +71,10 @@ libarchive-tools qemu-user qemu-user-binfmt`.
 cd /mnt/e/windows_project/tablet_linux
 tbctl dts                              # regenerate the DTS after editing tbctl/device/tb138fc/dts.py
 tbctl panel driver                     # panel .c from template + init sequence
-bash tools/extract-firmware.sh <zui14/image>  # once: stock firmware → ~/tb138fc/stock-fw
-bash tools/package-firmware.sh         # out/firmware-tb138fc.tar.gz (proprietary, not in git)
-bash tools/build-hexagonfs.sh <zui14/image>  # out/hexagonfs-tb138fc.tar.gz (SLPI sensor files)
+tbctl firmware extract                 # once: stock QFIL package ([build] stock_firmware) → <work>/stock-fw
+tbctl firmware stock-dt                # stock DTBs → <work>/stock (needed by `tbctl panel init-sequence`)
+tbctl firmware package                 # out/firmware-tb138fc.tar.gz (proprietary, not in git)
+tbctl firmware hexagonfs               # out/hexagonfs-tb138fc.tar.gz (SLPI sensor files; needs [build] backup)
 tbctl kernel build                     # Image.gz, DTB, modules (patches, panel + amp drivers, config)
 tbctl initramfs                        # out/initramfs.cpio.gz (reproducible)
 tbctl bootimg                          # out/boot.img

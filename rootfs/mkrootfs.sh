@@ -68,7 +68,7 @@ CHROOT
 cp "$REPO/rootfs/install-qbootctl.sh" "$MNT/tmp/"
 chroot "$MNT" /bin/sh /tmp/install-qbootctl.sh
 
-# SLPI sensors: stock sensor files + patched hexagonrpcd (tools/build-hexagonfs.sh)
+# SLPI sensors: stock sensor files + patched hexagonrpcd (tbctl firmware hexagonfs)
 if [ -f "$OUT/hexagonfs-tb138fc.tar.gz" ]; then
   tar -xzf "$OUT/hexagonfs-tb138fc.tar.gz" -C "$MNT"
   rm -rf "$MNT/tmp/hexagonrpcd-patches"; cp -r "$REPO/rootfs/hexagonrpcd-patches" "$MNT/tmp/"
@@ -107,7 +107,7 @@ install -m 644 "$REPO/rootfs/80-tb138fc-bt.rules" "$MNT/etc/udev/rules.d/"
 install -m 755 "$REPO/rootfs/tb138fc-bt-watchdog" "$MNT/usr/local/bin/tb138fc-bt-watchdog"
 ln -sf /etc/systemd/system/tb138fc-bt-watchdog.service "$MNT/etc/systemd/system/multi-user.target.wants/"
 
-# device firmware from the stock image (tools/extract-firmware.sh + tools/package-firmware.sh)
+# device firmware from the stock image (tbctl firmware extract + package)
 if [ -f "$OUT/firmware-tb138fc.tar.gz" ]; then
   tar -xzf "$OUT/firmware-tb138fc.tar.gz" -C "$MNT"
 else

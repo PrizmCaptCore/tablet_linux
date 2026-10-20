@@ -116,7 +116,7 @@ def derive(src: str) -> str:
 	};
 """)
 
-    # Remoteprocs and GPU zap shader: stock firmware squashed by tools/package-firmware.sh.
+    # Remoteprocs and GPU zap shader: stock firmware squashed by `tbctl firmware package`.
     for n in ['adsp', 'cdsp', 'slpi', 'venus']:
         sub(f'firmware-name = "qcom/sm8250/LENOVO/J716F/{n}.mbn";',
             f'firmware-name = "qcom/sm8250/LENOVO/TB138FC/{n}.mbn";')

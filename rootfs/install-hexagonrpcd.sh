@@ -1,7 +1,7 @@
 #!/bin/sh
 # On the tablet (root), or in the rootfs chroot: build linux-msm/hexagonrpc with registry write
 # support (hexagonrpcd-patches/) and serve the stock sensor files (hexagonfs, from
-# tools/build-hexagonfs.sh) to the SLPI ("sdsp").
+# tbctl firmware hexagonfs) to the SLPI ("sdsp").
 # libssc and iio-sensor-proxy from the Arch Linux ARM repos then expose the sensors to GNOME.
 #   sh install-hexagonrpcd.sh DIR_WITH_PATCHES
 set -e
