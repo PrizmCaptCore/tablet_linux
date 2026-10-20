@@ -1,0 +1,6 @@
+# Everything here runs on Linux (WSL, the tablet) or is kernel source: keep LF line endings
+# even on Windows checkouts with core.autocrlf=true (CRLF breaks shell scripts and init).
+* text=auto eol=lf
+*.img binary
+*.dtb binary
+*.dtbo binary
