@@ -1,3 +1,11 @@
 out/
 __pycache__/
 *.pyc
+
+# Device-unique data must never be committed: partition backups (IMEI/EFS, FRP, calibration,
+# MACs) live in E:\windows_project\secrets\tb138fc-backup, and raw boot/bootloader logs
+# carry the serial number. Register dumps in logs/regs/ are fine.
+backup/
+secrets/
+logs/*.log
+*.img
