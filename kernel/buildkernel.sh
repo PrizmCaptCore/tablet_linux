@@ -18,11 +18,14 @@ cp "$REPO/dts/$DTS_NAME.dts" arch/arm64/boot/dts/qcom/
 grep -q "$DTS_NAME.dtb" arch/arm64/boot/dts/qcom/Makefile || \
   sed -i "s/^dtb-\$(CONFIG_ARCH_QCOM)\t+= sm8250-hdk.dtb/&\ndtb-\$(CONFIG_ARCH_QCOM)\t+= $DTS_NAME.dtb/" arch/arm64/boot/dts/qcom/Makefile
 
-# kernel patches (kernel/patches/*.patch), applied once (skipped when already in the tree)
+# kernel patches (kernel/patches/*.patch), applied once in order; applied ones are recorded in
+# .tb138fc-patches (a reverse dry-run cannot tell for patch series that touch the same lines)
 for p in "$REPO"/kernel/patches/*.patch; do
   [ -e "$p" ] || continue
-  if patch -p1 -R --dry-run -s -f < "$p" >/dev/null 2>&1; then continue; fi
-  patch -p1 -s -f < "$p" && echo "applied $(basename "$p")"
+  grep -qxF "$(basename "$p")" .tb138fc-patches 2>/dev/null && continue
+  patch -p1 -s --no-backup-if-mismatch < "$p" || { echo "FAILED to apply $(basename "$p")"; exit 1; }
+  basename "$p" >> .tb138fc-patches
+  echo "applied $(basename "$p")"
 done
 
 # out-of-tree panel driver (kernel/panel/): Raydium RM692H0
@@ -59,13 +62,18 @@ Y="PINCTRL_SM8250 SM_GCC_8250 SM_GPUCC_8250 INTERCONNECT_QCOM_SM8250 QCOM_RPMHPD
    BATTERY_BQ27XXX BATTERY_BQ27XXX_I2C QCOM_SPMI_ADC5 QCOM_PDC QCOM_SCM QCOM_COMMAND_DB QCOM_AOSS_QMP
    TOUCHSCREEN_GOODIX_BERLIN_CORE TOUCHSCREEN_GOODIX_BERLIN_SPI INPUT_EVDEV
    TYPEC DRM_AUX_BRIDGE DRM_AUX_HPD_BRIDGE INTERCONNECT_QCOM_OSM_L3 POWER_RESET_QCOM_PON NVMEM_REBOOT_MODE
-   BLK_DEV_INITRD DEVTMPFS DEVTMPFS_MOUNT EXT4_FS VFAT_FS"
+   BLK_DEV_INITRD DEVTMPFS DEVTMPFS_MOUNT EXT4_FS VFAT_FS
+   RTC_DRV_PM8XXX"
 for o in $Y; do scripts/config -e $o; done
 # Must NOT be built in: probing it reprograms the display PLL and freezes the panel
 # (it is loaded later together with msm, which then drives the panel itself).
 scripts/config -m SM_DISPCC_8250
 scripts/config -m DRM_MSM -m DRM_PANEL_RAYDIUM_RM692H0
 scripts/config -m SND_SOC_CS35L43_I2C -m SND_SOC_SM8250
+scripts/config -m CHARGER_QCOM_SMB2    # PM8150B SMB5 via the qcom_smbx SMB5 series
+scripts/config -m UHID                # BlueZ HID-over-GATT (BLE keyboards/mice) needs /dev/uhid
+# Bluetooth hands-free/headset (HFP/HSP) and PAN tethering
+scripts/config -m BT_RFCOMM -e BT_RFCOMM_TTY -m BT_BNEP -e BT_BNEP_MC_FILTER -e BT_BNEP_PROTO_FILTER
 # Landlock: pacman's download sandbox needs it
 scripts/config -e SECURITY_LANDLOCK --set-str LSM "landlock,lockdown,yama,integrity,bpf"
 scripts/config -d LOCALVERSION_AUTO --set-str LOCALVERSION "-tb138fc"

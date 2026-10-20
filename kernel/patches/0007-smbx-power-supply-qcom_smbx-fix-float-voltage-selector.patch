@@ -1,0 +1,45 @@
+From ad66e214bde7d7f120884c05e5152c2097d3c96e Mon Sep 17 00:00:00 2001
+From: Robin Snyders <robin@snyders.xyz>
+Date: Wed, 12 Aug 2026 01:30:00 +0200
+Subject: [PATCH 4/8] power: supply: qcom_smbx: fix float voltage selector
+
+FLOAT_VOLTAGE_CFG encodes 3,487,500 uV as selector zero and advances in
+7,500 uV steps. The current calculation adds one to that selector, so it
+programs the requested float voltage one step too high.
+
+Remove the extra offset and name the hardware encoding constants.
+
+Fixes: 8648aeb5d7b7 ("power: supply: add Qualcomm PMI8998 SMB2 Charger driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Robin Snyders <robin@snyders.xyz>
+Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+---
+ drivers/power/supply/qcom_smbx.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/power/supply/qcom_smbx.c b/drivers/power/supply/qcom_smbx.c
+index 0e50d81..e236b95 100644
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -352,6 +352,8 @@
+ 
+ /* pmi8998 registers represent current in increments of 1/40th of an amp */
+ #define CURRENT_SCALE_FACTOR				25000
++#define SMB2_FLOAT_VOLTAGE_MIN_UV			3487500
++#define SMB2_FLOAT_VOLTAGE_STEP_UV			7500
+ /* clang-format on */
+ 
+ enum charger_status {
+@@ -993,7 +995,8 @@ static int smb_probe(struct platform_device *pdev)
+ 		return dev_err_probe(chip->dev, rc,
+ 				     "Failed to init status change work\n");
+ 
+-	rc = (chip->batt_info->voltage_max_design_uv - 3487500) / 7500 + 1;
++	rc = (chip->batt_info->voltage_max_design_uv -
++	      SMB2_FLOAT_VOLTAGE_MIN_UV) / SMB2_FLOAT_VOLTAGE_STEP_UV;
+ 	rc = regmap_update_bits(chip->regmap, chip->base + FLOAT_VOLTAGE_CFG,
+ 				FLOAT_VOLTAGE_SETTING_MASK, rc);
+ 	if (rc < 0)
+-- 
+2.53.0
+

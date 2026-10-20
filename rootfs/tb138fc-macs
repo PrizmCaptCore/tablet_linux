@@ -4,6 +4,8 @@
 #   fpinfo+0xa0  "D8:63:0D:xx:xx:xx"  Bluetooth
 #   fpinfo+0xc0  "D8:63:0D:xx:xx:xx"  Wi-Fi
 # Without a BD address the QCA6390 stays an "unconfigured controller" and bluetoothd ignores it.
+#   tb138fc-macs [bt|wifi]   (default: both). "bt" runs from udev whenever hci0 appears, so a
+#   re-probed controller (tb138fc-bt-watchdog) gets its address back too.
 dev=/dev/disk/by-partlabel/fpinfo
 [ -e "$dev" ] || exit 0
 
@@ -13,17 +15,18 @@ valid() { echo "$1" | grep -qE '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$'; }
 bt=$(read_mac 0xa0)
 wifi=$(read_mac 0xc0)
 
-if valid "$bt"; then
+if [ "${1:-bt}" != wifi ] && valid "$bt"; then
 	# hci0 shows up before the QCA firmware download finishes (~6 s after boot); the address
 	# can only be set once it is listed as an unconfigured controller
 	for i in $(seq 1 60); do
 		btmgmt config 2>/dev/null | grep -q 'Unconfigured controller' && break
+		bluetoothctl show 2>/dev/null | grep -qi "Controller $bt" && exit 0
 		sleep 0.5
 	done
 	btmgmt --index 0 public-addr "$bt" >/dev/null && echo "bluetooth address $bt"
 fi
 
-if valid "$wifi"; then
+if [ "${1:-wifi}" != bt ] && valid "$wifi"; then
 	for i in $(seq 1 20); do iface=$(ls /sys/class/ieee80211/*/device/net 2>/dev/null | head -1); [ -n "$iface" ] && break; sleep 0.5; done
 	if [ -n "$iface" ]; then
 		ip link set dev "$iface" down

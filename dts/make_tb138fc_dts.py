@@ -82,6 +82,21 @@ sub("""	/* SMB1390 charger @ 10 */
 	/* HL6111R wireless charging IC @ 25 */
 """, """	/* Qcom SMB1396 @ 34, SMB1396 slave @ 35, SMB1398 @ 36 */
 
+	/* stock fsa4480@43 (qcom,dp-aux-switch): routes the USB-C SBU pins to DP AUX */
+	typec-mux@43 {
+		compatible = "fcs,fsa4480";
+		reg = <0x43>;
+
+		mode-switch;
+		orientation-switch;
+
+		port {
+			fsa4480_sbu_mux: endpoint {
+				remote-endpoint = <&pm8150b_typec_sbu_out>;
+			};
+		};
+	};
+
 	/* Stock overlay lists bq27541 on both se3 and se15; it NACKs on i2c3, and lenovo-q706f uses i2c15 */
 	fuel-gauge@55 {
 		compatible = "ti,bq27541";
@@ -337,17 +352,68 @@ sub("""	/* CS35L43 audio amp @ 40 */
 		cirrus,vpbr-thld = <21>;
 	}};
 """ for addr, n in ((0x40, 4), (0x41, 1), (0x42, 2), (0x43, 3))))
+# The amps' interrupt outputs are open drain on one shared line: without the stock pull-up the
+# TLMM default pull-down keeps the level-low irq asserted (~200 irq/s, load average ~100).
+# Only the first amp to probe (@40) applies the pin state.
+sub("""		cirrus,dsp-part-name = "spk4-cs35l43";
+""", """		cirrus,dsp-part-name = "spk4-cs35l43";
+		pinctrl-0 = <&spk_amp_irq>;
+		pinctrl-names = "default";
+""")
+sub("""	wlan_en: wlan-en-state {""", """	spk_amp_irq: spk-amp-irq-state {
+		pins = "gpio68";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+		input-enable;
+	};
+
+	wlan_en: wlan-en-state {""")
 sub("""	vph_pwr: regulator-vph-pwr {""", """	sound {
 		compatible = "qcom,sm8250-sndcard";
 		model = "Lenovo-TB138FC";
 		pinctrl-0 = <&pri_mi2s_active>;
 		pinctrl-names = "default";
 
+		/*
+		 * Built-in mics: analog mics on the WCD938x (stock mixer_paths: handset-mic =
+		 * ADC1 "amic1", speaker-mic = ADC2 INP3 "amic3"), captured on TX_CODEC_DMA_TX_3.
+		 */
+		audio-routing = "AMIC1", "MIC BIAS1",
+				"AMIC2", "MIC BIAS2",
+				"AMIC3", "MIC BIAS3",
+				"TX SWR_ADC0", "ADC1_OUTPUT",	/* SM8250 TX macro widget names, as stock */
+				"TX SWR_ADC1", "ADC2_OUTPUT";
+
 		mm1-dai-link {
 			link-name = "MultiMedia1";
 
 			cpu {
 				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+			};
+		};
+
+		mm2-dai-link {
+			link-name = "MultiMedia2";
+
+			cpu {
+				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+			};
+		};
+
+		wcd-capture-dai-link {
+			link-name = "WCD Capture";
+
+			cpu {
+				sound-dai = <&q6afedai TX_CODEC_DMA_TX_3>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&wcd938x 1>, <&swr2 0>, <&txmacro 0>;
 			};
 		};
 
@@ -380,6 +446,267 @@ sub("&pcie0 {", """&q6afedai {
 &q6asmdai {
 	dai@0 {
 		reg = <0>;
+	};
+
+	dai@1 {
+		reg = <1>;
+	};
+};
+
+/* WCD938x on SoundWire, as on the kona MTP the stock DT derives from (sm8250-mtp.dts) */
+&rxmacro {
+	status = "okay";
+};
+
+&swr1 {
+	status = "okay";
+
+	wcd_rx: wcd9380-rx@0,4 {
+		compatible = "sdw20217010d00";
+		reg = <0 4>;
+		qcom,rx-port-mapping = <1 2 3 4 5>;
+	};
+};
+
+&txmacro {
+	status = "okay";
+};
+
+&swr2 {
+	status = "okay";
+
+	wcd_tx: wcd9380-tx@0,3 {
+		compatible = "sdw20217010d00";
+		reg = <0 3>;
+		qcom,tx-port-mapping = <2 3 4 5>;
+	};
+};
+
+&pcie0 {""")
+# Charging: PM8150B SMB5 main charger (qcom_smbx + kernel/patches SMB5 series). The stock
+# fast-charge path adds 2x SMB1396 charge pumps + SMB1398 (no mainline driver), so only the
+# main charger runs: 5 V input, ICL up to the stock 3 A. Battery values from the stock
+# battery-data: 4.485 V float - its node is named after Qualcomm's reference cell (4.40 V), but the
+# values are Lenovo's (4.485 V, 16 A, JEITA 4.23 V). The cell spec (L22D2P31) is unconfirmed, so
+# float is kept at 4.45 V. Charge current is capped at the stock cold-range 2.4 A because nothing
+# implements the stock JEITA/step charging yet.
+sub('#include "pm8150l.dtsi"\n', '#include "pm8150b.dtsi"\n#include "pm8150l.dtsi"\n')
+sub("""	vph_pwr: regulator-vph-pwr {""", """	/* stock wcd938x-codec: reset gpio32 (msm_cdc_pinctrl@32), 1.8 V supplies, micbias 1-3
+	 * 2.4 V and 4 1.8 V (no headset jack on this tablet; the codec only serves the mics) */
+	wcd938x: audio-codec {
+		compatible = "qcom,wcd9380-codec";
+
+		reset-gpios = <&tlmm 32 GPIO_ACTIVE_LOW>;
+
+		vdd-buck-supply = <&vreg_s4a_1p8>;
+		vdd-rxtx-supply = <&vreg_s4a_1p8>;
+		vdd-io-supply = <&vreg_s4a_1p8>;
+		vdd-mic-bias-supply = <&vreg_bob>;
+
+		qcom,micbias1-microvolt = <2400000>;
+		qcom,micbias2-microvolt = <2400000>;
+		qcom,micbias3-microvolt = <2400000>;
+		qcom,micbias4-microvolt = <1800000>;
+		qcom,mbhc-buttons-vthreshold-microvolt = <75000 150000 237000 500000 500000 500000 500000 500000>;
+		qcom,mbhc-headset-vthreshold-microvolt = <1700000>;
+		qcom,mbhc-headphone-vthreshold-microvolt = <50000>;
+		qcom,rx-device = <&wcd_rx>;
+		qcom,tx-device = <&wcd_tx>;
+
+		#sound-dai-cells = <1>;
+	};
+
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <8000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4450000>;
+		constant-charge-voltage-max-microvolt = <4450000>;
+		constant-charge-current-max-microamp = <2400000>;
+	};
+
+	vph_pwr: regulator-vph-pwr {""")
+sub("""	fuel-gauge@55 {
+		compatible = "ti,bq27541";
+		reg = <0x55>;
+	};""", """	fuel-gauge@55 {
+		compatible = "ti,bq27541";
+		reg = <0x55>;
+		monitored-battery = <&battery>;
+	};""")
+# USB-C: PM8150B Type-C + PD PHY (TCPM), wired like the SM8250 RB5 (same NB7VPQ904M
+# redriver). Dual role, preferring sink; dwc3 starts as peripheral so the USB NCM debug link
+# comes up before TCPM (a module) decides. Only 5 V is requested as a sink: the SMB5 series
+# does not program USBIN_ADAPTER_ALLOW for higher PD voltages yet. OTG VBUS is capped below
+# the stock otg-cl-ua (1.8 A).
+sub('#include "pm8150b.dtsi"\n', '#include <dt-bindings/usb/pd.h>\n#include "pm8150b.dtsi"\n')
+sub("&pcie0 {", """&pm8150b_vbus {
+	regulator-min-microamp = <500000>;
+	regulator-max-microamp = <1500000>;
+	status = "okay";
+};
+
+&pm8150b_typec {
+	vdd-pdphy-supply = <&vreg_l2a_3p1>;
+	status = "okay";
+
+	connector {
+		compatible = "usb-c-connector";
+		power-role = "dual";
+		data-role = "dual";
+		try-power-role = "sink";
+		self-powered;
+
+		vbus-supply = <&pm8150b_vbus>;
+
+		source-pdos = <PDO_FIXED(5000, 1500, PDO_FIXED_DUAL_ROLE |
+						 PDO_FIXED_USB_COMM |
+						 PDO_FIXED_DATA_SWAP)>;
+		sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_DUAL_ROLE |
+					       PDO_FIXED_USB_COMM |
+					       PDO_FIXED_DATA_SWAP)>;
+		op-sink-microwatt = <15000000>;
+
+		/* DisplayPort alt mode (external monitor), as on the RB5 */
+		altmodes {
+			displayport {
+				svid = /bits/ 16 <0xff01>;
+				vdo = <0x00001c46>;
+			};
+		};
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				pm8150b_hs_in: endpoint {
+					remote-endpoint = <&usb_1_dwc3_hs_out>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				pm8150b_typec_mux_in: endpoint {
+					remote-endpoint = <&redriver_usb_con_ss>;
+				};
+			};
+
+			port@2 {
+				reg = <2>;
+
+				pm8150b_typec_sbu_out: endpoint {
+					remote-endpoint = <&fsa4480_sbu_mux>;
+				};
+			};
+		};
+	};
+};
+
+&usb_1_dwc3_hs_out {
+	remote-endpoint = <&pm8150b_hs_in>;
+};
+
+&usb_1_qmpphy_out {
+	remote-endpoint = <&redriver_phy_con_ss>;
+};
+
+/*
+ * DP alt mode: mdss DP -> QMP combo PHY -> redriver -> connector. The RB5 uses 2 lanes
+ * (USB 3 alongside); allow 4 for DP-only adapters (pin assignment C, USB 2 hubs).
+ */
+&mdss_dp {
+	status = "okay";
+};
+
+&mdss_dp_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&usb_1_qmpphy_dp_in>;
+};
+
+&usb_1_qmpphy_dp_in {
+	remote-endpoint = <&mdss_dp_out>;
+};
+
+&pcie0 {""")
+sub("""&usb_1_dwc3 {
+	dr_mode = "peripheral";
+};""", """&usb_1_dwc3 {
+	dr_mode = "otg";
+	usb-role-switch;
+	role-switch-default-mode = "peripheral";
+};""")
+# stock: onnn,redriver @0x19 on se13, vdd pm8150_l16 (3.0-3.3 V, same range as here)
+sub("	/* onsemi USB redriver @ 19 */\n", """	typec-mux@19 {
+		compatible = "onnn,nb7vpq904m";
+		reg = <0x19>;
+
+		vcc-supply = <&vreg_l16a_3p3>;
+
+		retimer-switch;
+		orientation-switch;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				redriver_usb_con_ss: endpoint {
+					remote-endpoint = <&pm8150b_typec_mux_in>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				redriver_phy_con_ss: endpoint {
+					remote-endpoint = <&usb_1_qmpphy_out>;
+					data-lanes = <0 1 2 3>;
+				};
+			};
+
+		};
+	};
+
+""")
+sub("&pcie0 {", """&pm8150b_adc {
+	channel@7 {
+		reg = <ADC5_USB_IN_I>;
+		qcom,pre-scaling = <1 1>;
+		label = "usb_in_i_uv";
+	};
+
+	channel@8 {
+		reg = <ADC5_USB_IN_V_16>;
+		qcom,pre-scaling = <1 16>;
+		label = "usb_in_v_div_16";
+	};
+};
+
+&spmi_bus {
+	pmic@2 {
+		pm8150b_charger: charger@1000 {
+			compatible = "qcom,pm8150b-charger";
+			reg = <0x1000>;
+
+			/* stock qpnp-smb5: usbin-plugin, bat-ov, wdog-bark, usbin-icl-change */
+			interrupts = <0x2 0x13 0x4 IRQ_TYPE_EDGE_BOTH>,
+				     <0x2 0x12 0x2 IRQ_TYPE_EDGE_BOTH>,
+				     <0x2 0x16 0x1 IRQ_TYPE_EDGE_RISING>,
+				     <0x2 0x13 0x7 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "usb-plugin", "bat-ov", "wdog-bark", "usbin-icl-change";
+
+			io-channels = <&pm8150b_adc ADC5_USB_IN_I>,
+				      <&pm8150b_adc ADC5_USB_IN_V_16>;
+			io-channel-names = "usbin_i", "usbin_v";
+
+			monitored-battery = <&battery>;
+		};
 	};
 };
 

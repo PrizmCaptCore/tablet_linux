@@ -22,15 +22,20 @@ Pad Pro 12.6 (Q706F) ports.
 | Remoteprocs (ADSP, CDSP, SLPI) | ✅ | stock firmware (`tools/package-firmware.sh`) |
 | Sensors (SLPI: ICM4x6xx accel, AK0991x compass, light) | ✅ | hexagonrpcd (+registry write patches) → libssc → iio-sensor-proxy; auto-rotate verified |
 | Speakers (4× CS35L43, ADSP) | ✅ | vendored CS35L43 driver + factory calibration, primary MI2S, UCM `rootfs/ucm2/`; stereo verified |
-| Microphones (WCD938x/VA macro), charging (SMB1396/1398) | ❌ | |
+| Charging (PM8150B SMB5 main charger) | ✅ | qcom_smbx + SMB5 series (kernel/patches 0004-0013): 4.45 V float, 2.4 A; input follows Type-C/PD (5 V, up to 3 A) via `tb138fc-usb-icl`; no fast charge (SMB1396/1398 charge pumps) |
+| USB-C (PM8150B TCPM, NB7VPQ904M redriver) | ✅ | dual role: device (NCM debug) / host + OTG VBUS (USB-C earphones verified); PD sink 5 V; DP alt mode TODO |
+| RTC / clock | ✅ | PM8150 RTC is read-only: `tb138fc-rtc` keeps the offset (clock was 1970 until NTP -> HTTPS errors) |
+| Microphone (WCD938x analog, amic1) | ✅ | WCD938x on SoundWire + TX macro, UCM "Mic"; verified in GNOME |
 
 Details: [docs/HARDWARE.md](docs/HARDWARE.md) · history and lessons: [docs/PROGRESS.md](docs/PROGRESS.md) ·
 restoring Android / unbricking: [docs/RECOVERY.md](docs/RECOVERY.md)
 
+### notice
+most driver came from out of this repo, so I think some of the driver can't work well like revision model and so on.
 ## Layout
 
 ```
-env.sh                    shared paths for the WSL build scripts
+env.sh                    shared paths for the WSL build scripts (Just my case, not all of yours. If you want to use other case, than modify this file.)
 dts/                      sm8250-lenovo-tb138fc.dts + generator (from J716F) + reference DTS
 kernel/                   buildkernel.sh (config + build), mkboot.sh (boot.img for boot_a),
                           panel/ (RM692H0 driver + generator), patches/ (applied by buildkernel.sh)

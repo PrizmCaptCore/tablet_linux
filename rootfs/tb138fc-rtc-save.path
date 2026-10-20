@@ -1,0 +1,9 @@
+[Unit]
+Description=Save the RTC offset once NTP has synchronized the clock
+
+[Path]
+PathExists=/run/systemd/timesync/synchronized
+Unit=tb138fc-rtc-save.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Set the Bluetooth address from the fpinfo partition
+# started by udev (80-tb138fc-bt.rules) whenever hci0 appears
+Requires=dev-disk-by\x2dpartlabel-fpinfo.device
+After=dev-disk-by\x2dpartlabel-fpinfo.device bluetooth.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tb138fc-macs bt

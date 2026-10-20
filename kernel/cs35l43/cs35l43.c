@@ -1527,7 +1527,14 @@ int cs35l43_suspend_runtime(struct device *dev)
 		cs35l43->power_on_seq.name = "PM_PWR_ON_SEQ";
 		cs35l43->power_on_seq.length = CS35L43_POWER_SEQ_MAX_WORDS;
 		ret = cs35l43_write_seq_init(cs35l43, &cs35l43->power_on_seq);
-		if (ret == -EINVAL) {
+		/*
+		 * Mainline cs_dsp returns -ENOENT for a missing control (the Android
+		 * wm_adsp returned -EINVAL). Lenovo's protection firmware is v7.13.1,
+		 * so without this the fallback never ran, runtime suspend failed and
+		 * runtime PM stuck in the error state: the speakers could no longer
+		 * be opened (intermittently, depending on suspend timing).
+		 */
+		if (ret == -EINVAL || ret == -ENOENT) {
 			/* Fall back to control used before 7.15.3 */
 			cs35l43->power_on_seq.name = "POWER_ON_SEQUENCE";
 			ret = cs35l43_write_seq_init(cs35l43,

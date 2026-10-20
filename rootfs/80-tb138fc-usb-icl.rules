@@ -1,0 +1,3 @@
+# Apply the Type-C/PD current (TCPM supply) to the PM8150B charger input limit, also after
+# the charger re-applies its BC1.2 limit on plug-in.
+SUBSYSTEM=="power_supply", KERNEL=="tcpm-source-psy-*|pm8150b-charger", ACTION=="add|change", RUN+="/usr/local/bin/tb138fc-usb-icl"

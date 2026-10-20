@@ -86,10 +86,26 @@ install -m 755 "$REPO/rootfs/tb138fc-spk-cal" "$MNT/usr/local/bin/tb138fc-spk-ca
 install -m 644 "$REPO/rootfs/tb138fc-spk-cal.service" "$MNT/etc/systemd/system/"
 ln -sf /etc/systemd/system/tb138fc-spk-cal.service "$MNT/etc/systemd/system/multi-user.target.wants/"
 
+# System clock from the RTC + saved offset (the RTC cannot be set; it started in 1970)
+install -m 755 "$REPO/rootfs/tb138fc-rtc" "$MNT/usr/local/bin/tb138fc-rtc"
+install -m 644 "$REPO"/rootfs/tb138fc-rtc{.service,-save.path,-save.service} "$MNT/etc/systemd/system/"
+mkdir -p "$MNT/etc/systemd/system/sysinit.target.wants"
+ln -sf /etc/systemd/system/tb138fc-rtc.service "$MNT/etc/systemd/system/sysinit.target.wants/"
+ln -sf /etc/systemd/system/tb138fc-rtc-save.path "$MNT/etc/systemd/system/multi-user.target.wants/"
+
+# USB-C: charger input limit follows the Type-C/PD contract
+install -m 755 "$REPO/rootfs/tb138fc-usb-icl" "$MNT/usr/local/bin/tb138fc-usb-icl"
+install -m 644 "$REPO/rootfs/80-tb138fc-usb-icl.rules" "$MNT/etc/udev/rules.d/"
+
 # Bluetooth/Wi-Fi addresses from fpinfo (QCA6390 BT stays unconfigured without a BD address)
 install -m 755 "$REPO/rootfs/tb138fc-macs" "$MNT/usr/local/bin/tb138fc-macs"
 install -m 644 "$REPO/rootfs/tb138fc-macs.service" "$MNT/etc/systemd/system/"
 ln -sf /etc/systemd/system/tb138fc-macs.service "$MNT/etc/systemd/system/multi-user.target.wants/"
+# Bluetooth address on every hci0 probe + crash-loop recovery
+install -m 644 "$REPO/rootfs/tb138fc-bt-addr.service" "$REPO/rootfs/tb138fc-bt-watchdog.service" "$MNT/etc/systemd/system/"
+install -m 644 "$REPO/rootfs/80-tb138fc-bt.rules" "$MNT/etc/udev/rules.d/"
+install -m 755 "$REPO/rootfs/tb138fc-bt-watchdog" "$MNT/usr/local/bin/tb138fc-bt-watchdog"
+ln -sf /etc/systemd/system/tb138fc-bt-watchdog.service "$MNT/etc/systemd/system/multi-user.target.wants/"
 
 # device firmware from the stock image (tools/extract-firmware.sh + tools/package-firmware.sh)
 if [ -f "$OUT/firmware-tb138fc.tar.gz" ]; then
@@ -142,6 +158,11 @@ DHCPServer=yes
 [DHCPServer]
 PoolOffset=2
 PoolSize=8
+
+# the PC side of the gadget has a fixed MAC: give it a fixed address (Moonlight host, ssh)
+[DHCPServerStaticLease]
+MACAddress=02:7b:13:8f:c0:02
+Address=172.16.42.6
 EOF
 mkdir -p "$MNT/etc/NetworkManager/conf.d"
 printf '[keyfile]\nunmanaged-devices=interface-name:usb0\n' > "$MNT/etc/NetworkManager/conf.d/usb0.conf"

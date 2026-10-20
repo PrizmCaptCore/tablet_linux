@@ -1,0 +1,36 @@
+power: supply: core: add an init callback run before the supply is published
+
+Local backport of the power_supply_desc init() hook from the power-supply tree, needed by
+the qcom_smbx SMB5 series (patch 0011) on 7.2.
+
+diff -ru a/drivers/power/supply/power_supply_core.c b/drivers/power/supply/power_supply_core.c
+--- a/drivers/power/supply/power_supply_core.c	2026-10-20 21:16:34.401808331 +0900
++++ b/drivers/power/supply/power_supply_core.c	2026-10-20 21:16:34.409808331 +0900
+@@ -1622,6 +1622,12 @@
+ 
+ 	spin_lock_init(&psy->changed_lock);
+ 	init_rwsem(&psy->extensions_sem);
++
++	if (desc->init) {
++		rc = desc->init(psy);
++		if (rc)
++			goto check_supplies_failed;
++	}
+ 	INIT_LIST_HEAD(&psy->extensions);
+ 
+ 	rc = device_add(dev);
+diff -ru a/include/linux/power_supply.h b/include/linux/power_supply.h
+--- a/include/linux/power_supply.h	2026-10-20 21:16:34.401808331 +0900
++++ b/include/linux/power_supply.h	2026-10-20 21:16:34.409808331 +0900
+@@ -281,6 +281,11 @@
+ 	int (*property_is_writeable)(struct power_supply *psy,
+ 				     enum power_supply_property psp);
+ 	void (*external_power_changed)(struct power_supply *psy);
++	/*
++	 * init() is called during registration, before the power supply is
++	 * published, so its properties are never visible half-initialized.
++	 */
++	int (*init)(struct power_supply *psy);
+ 
+ 	/*
+ 	 * Set if thermal zone should not be created for this power supply.

@@ -1,0 +1,11 @@
+[Unit]
+Description=Recover the Bluetooth controller from a crash loop
+After=systemd-journald.service
+
+[Service]
+ExecStart=/usr/local/bin/tb138fc-bt-watchdog
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

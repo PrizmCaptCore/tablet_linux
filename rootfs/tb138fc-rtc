@@ -1,0 +1,31 @@
+#!/bin/sh
+# The PM8150 RTC keeps counting across reboots but Linux may not set it (it starts at 1970
+# whenever the PMIC is reset), so the system clock came up in 1970 and HTTPS failed until NTP
+# synced. Like Android's time_daemon, keep "real time - RTC" on disk:
+#   tb138fc-rtc save     after NTP sync and at shutdown
+#   tb138fc-rtc restore  early at boot: system time = RTC + saved offset, unless the RTC
+#                        went backwards (PMIC reset); then systemd-timesyncd's saved clock
+#                        file still gives a sane lower bound.
+STATE=/var/lib/tb138fc-rtc
+RTC=/sys/class/rtc/rtc0/since_epoch
+[ -r "$RTC" ] || { echo "no RTC"; exit 0; }
+rtc=$(cat "$RTC")
+
+case "$1" in
+save)
+	# only trust a synchronized clock
+	[ -e /run/systemd/timesync/synchronized ] || exit 0
+	mkdir -p "$STATE"
+	echo "$(( $(date +%s) - rtc )) $rtc" > "$STATE/offset.new" && mv "$STATE/offset.new" "$STATE/offset"
+	;;
+restore)
+	read -r offset saved_rtc < "$STATE/offset" 2>/dev/null || exit 0
+	if [ "$rtc" -lt "$saved_rtc" ]; then
+		echo "RTC went backwards ($rtc < $saved_rtc), PMIC reset - not restoring"
+		exit 0
+	fi
+	now=$((rtc + offset))
+	[ "$now" -gt "$(date +%s)" ] && date -s "@$now" >/dev/null && echo "clock set from RTC: $(date)"
+	;;
+esac
+exit 0

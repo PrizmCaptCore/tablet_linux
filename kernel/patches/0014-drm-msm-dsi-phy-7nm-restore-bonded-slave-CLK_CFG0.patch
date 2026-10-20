@@ -1,0 +1,23 @@
+drm/msm/dsi/phy: 7nm: restore the bonded slave PHY's CMN_CLK_CFG0
+
+Local fix: TB138FC (bonded dual DSI) had DSI1 FIFO underflows after display off/on.
+
+--- a/drivers/gpu/drm/msm/dsi/phy/dsi_phy_7nm.c
++++ b/drivers/gpu/drm/msm/dsi/phy/dsi_phy_7nm.c
+@@ -671,6 +671,16 @@
+ 	dsi_pll_cmn_clk_cfg0_write(pll_7nm,
+ 				   DSI_7nm_PHY_CMN_CLK_CFG0_DIV_CTRL_3_0(cached->bit_clk_div) |
+ 				   DSI_7nm_PHY_CMN_CLK_CFG0_DIV_CTRL_7_4(cached->pix_clk_div));
++	/*
++	 * Bonded DSI: the slave PHY is reset on enable too, but nothing ever programs its
++	 * CMN_CLK_CFG0 (it only worked while the bootloader's value survived). With the
++	 * reset value its link runs with the wrong byte clock divider and its FIFOs
++	 * underflow after the first display off/on. Mirror the master's dividers.
++	 */
++	if (pll_7nm->slave)
++		dsi_pll_cmn_clk_cfg0_write(pll_7nm->slave,
++					   DSI_7nm_PHY_CMN_CLK_CFG0_DIV_CTRL_3_0(cached->bit_clk_div) |
++					   DSI_7nm_PHY_CMN_CLK_CFG0_DIV_CTRL_7_4(cached->pix_clk_div));
+ 	dsi_pll_cmn_clk_cfg1_update(pll_7nm, DSI_7nm_PHY_CMN_CLK_CFG1_DSICLK_SEL__MASK,
+ 				    cached->pll_mux);
+ 

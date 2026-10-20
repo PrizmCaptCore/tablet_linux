@@ -1,0 +1,6 @@
+[Unit]
+Description=Save the RTC offset
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tb138fc-rtc save

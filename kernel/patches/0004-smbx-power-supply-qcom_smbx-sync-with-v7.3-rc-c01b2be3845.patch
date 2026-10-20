@@ -1,0 +1,32 @@
+From 6d86aeb1486c99b0d618579ed66a398873ece6a3 Mon Sep 17 00:00:00 2001
+From: tb138fc <tb@local>
+Date: Tue, 20 Oct 2026 21:15:01 +0900
+Subject: [PATCH 1/8] power: supply: qcom_smbx: sync with v7.3-rc
+ (c01b2be3845f, ebf1d03dab96)
+
+---
+ drivers/power/supply/qcom_smbx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/power/supply/qcom_smbx.c b/drivers/power/supply/qcom_smbx.c
+index bf2e2cc..67fdb43 100644
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -922,8 +922,7 @@ static int smb_init_irq(struct smb_chip *chip, int *irq, const char *name,
+ 	rc = devm_request_threaded_irq(chip->dev, irqnum, NULL, handler,
+ 				       IRQF_ONESHOT, name, chip);
+ 	if (rc < 0)
+-		return dev_err_probe(chip->dev, rc, "Couldn't request irq %s\n",
+-				     name);
++		return rc;
+ 
+ 	if (irq)
+ 		*irq = irqnum;
+@@ -1057,3 +1056,4 @@ module_platform_driver(qcom_spmi_smb);
+ MODULE_AUTHOR("Casey Connolly <casey.connolly@linaro.org>");
+ MODULE_DESCRIPTION("Qualcomm SMB2 Charger Driver");
+ MODULE_LICENSE("GPL");
++MODULE_IMPORT_NS("IIO_CONSUMER");
+-- 
+2.53.0
+

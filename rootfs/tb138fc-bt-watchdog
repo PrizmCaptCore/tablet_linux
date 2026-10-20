@@ -1,0 +1,27 @@
+#!/bin/sh
+# Recover the QCA6390 Bluetooth controller from a crash loop. Seen once (boot 2026-10-20 23:10):
+# after an unexplained command timeout, every re-setup ended in a controller hardware error and
+# hci_qca crashed the chip for a memory dump - 120 times, every 3.5 s, until the next reboot.
+# hci_qca's own resets never got it out; a driver unbind/bind (full power-sequence off/on) does.
+# Trigger: 3 "crash the soc" within 60 s; at most one recovery per 10 minutes. The first
+# controller dump of each episode is kept in /var/lib/tb138fc-bt for analysis.
+STATE=/var/lib/tb138fc-bt
+mkdir -p "$STATE"
+last_recover=0
+times=""
+journalctl -k -f -n0 -o short-unix --grep "crash the soc to collect controller dump" | while read -r ts _; do
+	now=${ts%.*}
+	times="$(for t in $times; do [ $((now - t)) -lt 60 ] && echo "$t"; done) $now"
+	n=$(echo $times | wc -w)
+	[ "$n" -eq 1 ] && for d in /sys/class/devcoredump/devcd*; do
+		[ -e "$d/data" ] && cp "$d/data" "$STATE/qca-dump-$now.bin" 2>/dev/null && echo "saved controller dump $STATE/qca-dump-$now.bin" && break
+	done
+	if [ "$n" -ge 3 ] && [ $((now - last_recover)) -ge 600 ]; then
+		dev=$(readlink -f /sys/class/bluetooth/hci0/device 2>/dev/null)
+		[ -n "$dev" ] || continue
+		drv=$(readlink -f "$dev/driver"); name=$(basename "$dev")
+		echo "Bluetooth crash loop ($n crashes in 60 s): power-cycling $name"
+		echo "$name" > "$drv/unbind"; sleep 5; echo "$name" > "$drv/bind"
+		last_recover=$now; times=""
+	fi
+done

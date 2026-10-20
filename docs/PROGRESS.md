@@ -122,10 +122,88 @@ explained hours of noise/mirroring experiments.
   `tb138fc-spk-cal` -> sysfs `calibration` -> driver writes CAL_R/AMBIENT/STATUS/CHECKSUM.
   This firmware marks CAL_R read-only, so cs_dsp coeff writes fail (-EPERM); the driver
   writes the XM words directly (`cs_dsp_write_data_word`).
+- Shared amp irq (gpio68, level low) needs the stock pull-up: the TLMM default pull-down kept
+  it asserted -> ~200 irq/s and 4 irq threads hammering i2c4. Fixed with a pin state on
+  speaker-amp@40; `gpioget --bias` is useless for testing this (bias reverts on release).
 - Don't stop the user's PipeWire for raw `aplay` tests (it removed the sound device in GNOME).
 - Seen once: CDSP "failed to authenticate image" + ADSP announcing no QRTR services (no
   sound card); fine after reboot. Watch for recurrence.
 
+### Charging (PM8150B SMB5)
+- Without a driver the SMB5 ran on bootloader defaults (~0.9 A). Mainline qcom_smbx only knows
+  SMB2; SMB5 support is a posted series (Robin Snyders / Casey Connolly, v4 2026-08-20) on top
+  of a 5-patch fixes series and a power_supply init() hook from the power-supply tree. Rebuilt
+  against 7.2.11 as kernel/patches 0004-0012 (0004 syncs qcom_smbx.c with 7.3, 0012 backports
+  the init() hook).
+- buildkernel.sh used a reverse dry-run to skip applied patches; that misfires for series
+  touching the same lines (half-applied hunks). Applied patches are now recorded in
+  $KERNEL/.tb138fc-patches.
+- DT: pm8150b.dtsi (was missing - J716F lacks it), charger@1000 with stock irqs, ADC5
+  USB_IN_I/USB_IN_V_16, simple-battery (also monitored by bq27541).
+- Float voltage: stock battery-data says 4.485 V, but its node carries Qualcomm's reference
+  cell name and the cell spec is unconfirmed. First boot at 4.48 V charged a full battery
+  towards it; charging was suspended (`echo Unknown > .../pm8150b-charger/status` = USBIN
+  suspend) and the float lowered to 4.45 V.
+- Input: APSD sees the PC port as SDP (500 mA) but hardware AICL settles at 2 A on this port
+  (4.65 V x 1.98 A). DCP chargers get 1.5 A; 3 A needs Type-C Rp/PD (TCPM).
+
+### USB-C / PD / clock
+- PM8150B Type-C (TCPM) wired like the RB5 (same NB7VPQ904M redriver). dwc3 is otg with
+  role-switch-default-mode = peripheral, so the NCM debug link comes up before TCPM (module).
+  Step 1 (sink/device only) then step 2 (dual role, OTG VBUS) - debug link survived both.
+- Sink PDOs: 5 V only - the SMB5 series doesn't program USBIN_ADAPTER_ALLOW for 9 V+. Not
+  worth it while charge current is capped at 2.4 A (and the system idles properly: cpufreq-hw
+  + schedutil, ~90-98 % in cpu-sleep, GPU at min).
+- TCPM's power supply knows the Type-C/PD current, qcom_smbx only BC1.2. `tb138fc-usb-icl`
+  (udev) copies it to the charger; SMB5 ignores USBIN_CURRENT_LIMIT_CFG without the ICL
+  override bit, hence patch 0013 (explicit limit -> override; BC1.2 path clears it).
+- OTG verified with USB-C earphones. The tablet rebooted once during that test (cause unknown).
+- Clock: rtc-pm8xxx is read-only and the RTC only counts since the last PMIC reset, so every
+  boot started in 1970 until NTP (Firefox: "potential security threat"). `tb138fc-rtc` saves
+  real-time minus RTC after NTP sync / at shutdown and restores it at boot (RTC_DRV_PM8XXX
+  built in; waiting for dev-rtc0.device as a module hit the 90 s device timeout).
+- BLE keyboard (HID-over-GATT) paired but typed nothing: BlueZ needs /dev/uhid and
+  CONFIG_UHID was off (BT_HIDP only covers classic BT). Now built as a module.
+
+### Display off/on (screen timeout)
+- After the first DPMS off/on the panel stayed broken with `dsi_err_worker: status=4` (DSI
+  FIFO error) ~30k/s. Register diff boot vs resume (tools/disp-regdump.sh): DSI1 FIFO status
+  0x9999xxxx (HS FIFO underflow on all lanes) and DSI1 PHY CMN_CLK_CFG0 0xf1 instead of 0x61.
+- msm saves/restores only the master PLL state, and nothing ever programs the bonded slave's
+  CMN_CLK_CFG0 - it only worked while the bootloader's value survived the first PHY reset.
+  kernel/patches/0014 mirrors the master's dividers to the slave in restore_state.
+- Reproduce/test remotely: Mutter `org.gnome.Mutter.DisplayConfig.PowerSaveMode` 3/0 on the
+  session bus of whoever owns the seat (gdm-greeter at the login screen).
+- Careful: reading the DSC registers (0xae80000) with regdump while unclocked crashed the tablet.
+
+## Mics (WCD938x)
+- Built-in mics are analog on a WCD938x (no headset jack), like the kona MTP: sm8250-mtp.dts
+  wcd938x + swr1/swr2 + rx/tx macros, stock micbias 2.4 V. Capture link TX_CODEC_DMA_TX_3 via
+  MultiMedia2; routes need the SM8250 TX macro names (TX SWR_ADC0/1), not SM8450's
+  TX SWR_INPUTx - a wrong route name killed the whole card (speakers too).
+- amic1 (stock handset-mic) verified: noise floor -82 dBFS, speech/claps up to -42 dBFS.
+  UCM "Mic" device (mono, ADC1 analog gain 12 dB). The MultiMedia2 FE route must be in the
+  verb EnableSequence: PipeWire probes PCMs before enabling devices, and an unrouted FE fails
+  to open, which drops the whole HiFi profile (speakers too).
+- Speakers intermittently unusable ~20 s after boot (runtime PM "error" on all amps): the
+  CS35L43 driver only fell back to POWER_ON_SEQUENCE (firmware < 7.15.3; Lenovo's is 7.13.1)
+  on -EINVAL, but mainline cs_dsp returns -ENOENT for a missing control. Fixed in
+  kernel/cs35l43/cs35l43.c.
+
+### Bluetooth crash loop
+- Seen once in ~30 boots (boot of 2026-10-20 23:10, ~100 s in): "unexpected event for opcode
+  0xe000/0x2400", command 0xfc00 tx timeout, then every re-setup ended in a controller
+  hardware error and hci_qca crashed the chip for a memdump - 120 times, every 3.5 s, until
+  reboot. Trigger not reproduced; hci_qca's own recovery never got out of it.
+- `tb138fc-bt-watchdog`: 3 "crash the soc" in 60 s -> unbind/bind hci_uart_qca (full power
+  sequence off/on; Wi-Fi unaffected), max once per 10 min, keeps the first controller dump in
+  /var/lib/tb138fc-bt. Verified by injecting the message via /dev/kmsg.
+- A re-probed controller is unconfigured again, so the BD address is now set by
+  `tb138fc-bt-addr.service`, started from udev on every hci0 add (tb138fc-macs bt|wifi).
+- BT_RFCOMM / BT_BNEP were missing (bluetoothd: RFCOMM server failed) -> HFP/HSP and PAN enabled.
+
 ## Next
 2. Audio input: microphones (WCD938x / VA macro DMICs), USB-C headset.
-3. Charging: SMB1396 ×2 + SMB1398 on i2c15; verify PM8150B charging under Linux.
+3. Charging: PM8150B Type-C/TCPM for 3 A / PD input (watch the usb0 debug link), JEITA/step
+   charging, SMB1396/SMB1398 charge pumps (no driver). Boot-time load-average burst (~100-160
+   in the first ~40 s, then idle) - not yet explained.

@@ -2,6 +2,7 @@
 # On the tablet (root): dump display-path registers (DPU blocks, DSI controllers, DSI PHY/PLL).
 #   sh disp-regdump.sh OUTFILE
 # Offsets: DPU blocks from dpu_6_0_sm8250.h relative to the mdp region at 0xae01000.
+# Do not add the DSC blocks (0xae80000): reading them while unclocked crashed the tablet.
 OUT=${1:-/tmp/disp-regs.txt}
 /usr/local/bin/regdump \
   mdp_top:0xae01000:0x494 \

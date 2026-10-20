@@ -1,0 +1,41 @@
+power: supply: qcom_smbx: let an explicit SMB5 input limit override BC1.2
+
+Local: lets the Type-C/PD current applied by rootfs/tb138fc-usb-icl take effect.
+
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -717,6 +717,10 @@
+ 	}
+ 
+ 	smb_set_current_limit(chip, current_ua);
++	/* the BC1.2 result applies until userspace sets a Type-C/PD limit */
++	if (chip->gen == SMB5)
++		regmap_update_bits(chip->regmap, chip->base + CMD_ICL_OVERRIDE,
++				   ICL_OVERRIDE_BIT, 0);
+ 	power_supply_changed(chip->chg_psy);
+ }
+ 
+@@ -878,8 +882,21 @@
+ 	case POWER_SUPPLY_PROP_STATUS:
+ 		return regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
+ 					  USBIN_SUSPEND_BIT, !val->intval);
+-	case POWER_SUPPLY_PROP_CURRENT_MAX:
+-		return smb_set_current_limit(chip, val->intval);
++	case POWER_SUPPLY_PROP_CURRENT_MAX: {
++		int rc = smb_set_current_limit(chip, val->intval);
++
++		if (rc || chip->gen != SMB5)
++			return rc;
++		/*
++		 * Without the override SMB5 keeps limiting to its BC1.2 result
++		 * (500 mA on an SDP) whatever USBIN_CURRENT_LIMIT_CFG says. A limit
++		 * set from userspace (the Type-C/PD contract) must take effect;
++		 * hardware AICL still backs off if the source sags.
++		 */
++		return regmap_update_bits(chip->regmap, chip->base + CMD_ICL_OVERRIDE,
++					  ICL_OVERRIDE_BIT,
++					  val->intval > SDP_CURRENT_UA ? ICL_OVERRIDE_BIT : 0);
++	}
+ 	default:
+ 		dev_err(chip->dev, "No setter for property: %d\n", psp);
+ 		return -EINVAL;

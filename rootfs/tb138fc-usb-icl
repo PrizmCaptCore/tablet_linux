@@ -1,0 +1,18 @@
+#!/bin/sh
+# Follow the USB-C/PD contract with the charger input current limit. TCPM (PM8150B Type-C)
+# reports what the source offers (Type-C Rp 1.5/3 A or the PD contract) on its power supply,
+# but qcom_smbx only knows the BC1.2 result (SDP 500 mA / DCP 1.5 A), which it re-applies on
+# every plug-in. Run by udev on changes of either supply; capped at the stock 3 A USB input
+# limit. Writing current_max also sets the SMB5 ICL override (kernel/patches/0013); hardware
+# AICL still backs off if the source sags.
+CHG=/sys/class/power_supply/pm8150b-charger/current_max
+MAX=3000000
+[ -w "$CHG" ] || exit 0
+for t in /sys/class/power_supply/tcpm-source-psy-*; do
+	[ "$(cat "$t/online" 2>/dev/null)" = 1 ] || exit 0
+	ua=$(cat "$t/current_max" 2>/dev/null)
+done
+[ "${ua:-0}" -gt 500000 ] 2>/dev/null || exit 0
+[ "$ua" -gt "$MAX" ] && ua=$MAX
+echo "$ua" > "$CHG"
+logger -t tb138fc-usb-icl "USB input limit ${ua} uA"
