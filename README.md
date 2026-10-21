@@ -11,7 +11,7 @@ Pad Pro 12.6 (Q706F) ports. Everything is built and flashed with one tool, `tbct
 | Boot (abl → kernel) | ✅ | image flashed to `boot_a`; `dtbo_a` erased |
 | UFS storage | ✅ | |
 | USB (peripheral, NCM debug network) | ✅ | tablet `172.16.42.1` |
-| Display (RM692H0, dual DSI, DSC) | ✅ | msm DRM + `kernel/panel/panel-raydium-rm692h0.c`, command mode, 120 Hz (`refresh=60` option), DCS brightness 0-2047 |
+| Display (RM692H0, dual DSI, DSC) | ✅ | msm DRM + `data/kernel/panel/panel-raydium-rm692h0.c`, command mode, 120 Hz (`refresh=60` option), DCS brightness 0-2047 |
 | GPU (Adreno 650) | ✅ | Freedreno/GBM; GNOME renders on the GPU |
 | Touchscreen (Goodix GT9966S) | ✅ | `goodix,gt9916` on spi0, GPIO chip-select |
 | Fuel gauge (bq27541) | ✅ | i2c15 |
@@ -21,9 +21,9 @@ Pad Pro 12.6 (Q706F) ports. Everything is built and flashed with one tool, `tbct
 | Bluetooth (QCA6390) | ✅ | BD address from fpinfo; crash-loop watchdog; BLE keyboards (uhid) |
 | Remoteprocs (ADSP, CDSP, SLPI) | ✅ | stock firmware (`tbctl firmware package`) |
 | Sensors (SLPI: ICM4x6xx accel, AK0991x compass, light) | ✅ | hexagonrpcd (+registry write patches) → libssc → iio-sensor-proxy; auto-rotate verified |
-| Speakers (4× CS35L43, ADSP) | ✅ | vendored CS35L43 driver + factory calibration, primary MI2S, UCM in `rootfs/overlay/usr/share/alsa/ucm2/`; stereo verified |
+| Speakers (4× CS35L43, ADSP) | ✅ | vendored CS35L43 driver + factory calibration, primary MI2S, UCM in `data/rootfs/overlay/usr/share/alsa/ucm2/`; stereo verified |
 | Microphone (WCD938x analog, amic1) | ✅ | WCD938x on SoundWire + TX macro, UCM "Mic"; verified in GNOME |
-| Charging (PM8150B SMB5 main charger) | ✅ | qcom_smbx + SMB5 series (kernel/patches 0004-0013): 4.45 V float, 2.4 A; input follows Type-C/PD (5 V, up to 3 A) via `tb138fc-usb-icl`; no fast charge (SMB1396/1398 charge pumps) |
+| Charging (PM8150B SMB5 main charger) | ✅ | qcom_smbx + SMB5 series (`data/kernel/patches` 0004-0013): 4.45 V float, 2.4 A; input follows Type-C/PD (5 V, up to 3 A) via `tb138fc-usb-icl`; no fast charge (SMB1396/1398 charge pumps) |
 | USB-C (PM8150B TCPM, NB7VPQ904M redriver) | ✅ | dual role: device (NCM debug) / host + OTG VBUS (USB-C earphones verified); PD sink 5 V; DP alt mode (external monitor): 4K30 over a 2-lane USB-C/HDMI hub, repeated plug/unplug OK |
 | RTC / clock | ✅ | PM8150 RTC is read-only: `tb138fc-rtc` keeps the offset (correct after the first NTP sync) |
 | System sleep (suspend) | ❌ | not verified; the sleep targets are masked |
@@ -31,7 +31,7 @@ Pad Pro 12.6 (Q706F) ports. Everything is built and flashed with one tool, `tbct
 Details: [docs/HARDWARE.md](docs/HARDWARE.md) · history and lessons: [docs/PROGRESS.md](docs/PROGRESS.md) ·
 restoring Android / unbricking / bootloader unlock: [docs/RECOVERY.md](docs/RECOVERY.md)
 
-Several drivers come from outside mainline (vendored or patched, see `kernel/`), and only this
+Several drivers come from outside mainline (vendored or patched, see `data/kernel/`), and only this
 one unit has been tested: other hardware revisions of the tablet may differ.
 
 ## Installing
@@ -111,7 +111,7 @@ Login: `[tablet] user` in `config.toml`, a `.env` file next to it with `ID=` and
 Development of the device files themselves:
 
 ```bash
-tbctl dts                              # regenerate dts/ after editing tbctl/device/tb138fc/dts.py
+tbctl dts                              # regenerate data/dts/ after editing tbctl/device/tb138fc/dts.py
 tbctl panel driver                     # panel .c from template + init sequence
 tbctl firmware stock-dt                # stock DTBs → <work>/stock (for `tbctl panel init-sequence`)
 tbctl firmware devmap                  # docs/stock-devmap.txt from the stock overlay
@@ -122,20 +122,22 @@ tbctl rootfs inspect IMAGE             # summary of a built image
 ## Layout
 
 ```
-tbctl/                    the tool (Python): core/ (config, processes, WSL, chroot, Android
-                          images), distro/archlinux/ (device-neutral Arch + GNOME image),
-                          device/tb138fc/ (dts, panel, kernel, initramfs, boot image, firmware,
-                          rootfs layer), tablet_access/ (ssh, fastboot, rescue shell, debug)
-dts/                      sm8250-lenovo-tb138fc.dts (generated) + reference trees in ref/
-kernel/                   tb138fc.config (config fragment), patches/ (applied in order),
-                          panel/ (RM692H0 driver: template + init sequence), cs35l43/ (amp driver)
-initramfs/                init (switch to Arch, or rescue shell), static helper sources
-rootfs/                   overlay/ (device files in their install location: services, udev,
-                          UCM, USB gadget, ...), build/ (qbootctl, hexagonrpcd + patches,
-                          built from source inside the image)
-docs/                     hardware notes, stock device map, decompiled stock DT, recovery
-config.example.toml       settings template (copy to config.toml)
-out/                      build outputs (ignored by git)
+tbctl/                        the tool (Python)
+  core/                       config, processes, WSL, chroot, Android images
+  distro/archlinux/           device-neutral Arch Linux ARM + GNOME image (+ data/: fonts)
+  device/tb138fc/             build steps: dts, panel, kernel, initramfs, boot image,
+                              firmware, rootfs layer
+    data/                     what those steps read (below: data/)
+      dts/                    sm8250-lenovo-tb138fc.dts (generated) + reference trees in ref/
+      kernel/                 tb138fc.config, patches/ (applied in order),
+                              panel/ (RM692H0 driver), cs35l43/ (amp driver)
+      initramfs/              init (switch to Arch, or rescue shell), static helper sources
+      rootfs/                 overlay/ (device files in their install location), build/
+                              (qbootctl, hexagonrpcd + patches, built inside the image)
+  tablet_access/              ssh, fastboot, rescue shell, debug helpers
+docs/                         hardware notes, stock device map, decompiled stock DT, recovery
+config.example.toml           settings template (copy to config.toml)
+out/                          build outputs (ignored by git)
 ```
 
 Boot flow: abl → kernel + initramfs → mounts `PARTLABEL=userdata` and `switch_root`s into
@@ -154,6 +156,6 @@ USB networking and telnet (`tbctl rescue`).
 ## License
 
 GPL-2.0-only (see [LICENSE](LICENSE)), like the kernel code it carries. Patches to other
-projects (`kernel/patches/`, `rootfs/build/hexagonrpcd-patches/`) follow the license of the
+projects (`data/kernel/patches/`, `data/rootfs/build/hexagonrpcd-patches/`) follow the license of the
 project they patch. Firmware extracted from the stock image is Lenovo/Qualcomm property and
 is never part of this repository.
