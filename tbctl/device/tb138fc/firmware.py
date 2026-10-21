@@ -3,7 +3,8 @@
 persist backup (`[build] backup`). Nothing produced here may be committed.
 
   extract():   NON-HLOS.bin, BTFM.bin and vendor (inside super) -> <work>/stock-fw
-  stock_dt():  boot.img/dtbo.img DTBs -> <work>/stock (+ decompiled into docs/stock-dt)
+  stock_dt():  boot.img/dtbo.img DTBs -> <work>/stock (decompiled .dts next to each;
+               dtbo entry ovl04 is this board: "kona MTP", board-id 0x10008)
   package():   remoteproc/GPU zap/amp firmware -> out/firmware-tb138fc.tar.gz
   hexagonfs(): hexagonrpcd's file tree (SLPI sensors) -> out/hexagonfs-tb138fc.tar.gz
 """
@@ -14,7 +15,7 @@ import subprocess
 from pathlib import Path
 
 from tbctl.core import android, host
-from tbctl.core.config import REPO, load
+from tbctl.core.config import load
 from tbctl.core.process import BuildError, log, run
 
 # pil-squasher merges split .mdt/.bNN images into one .mbn, pinned to the revision used
@@ -26,9 +27,6 @@ FIRMWARE_DIR = "usr/lib/firmware/qcom/sm8250/LENOVO/TB138FC"
 HEXAGONFS_DIR = "usr/share/qcom/sm8250/Lenovo/TB138FC"
 REMOTEPROCS = ("adsp", "cdsp", "slpi", "venus")
 VENDOR_DIRS = ("firmware", "firmware_mnt", "etc/wifi", "lib/firmware")
-# stock DT: dtbo entry ovl04 is "kona MTP", board-id 0x10008 (this board)
-STOCK_DT_DOCS = {"dtbs/base00.dts": "base-kona-v2.1.dts",
-                 "dtbos/ovl04.dts": "overlay-kona-mtp-0x10008.dts"}
 
 # Dynamic sensor modules (bring-to-ear, WiGig sensing; phone features): the SLPI stalls loading
 # sns_bring_to_ear.so over FastRPC and its watchdog kills the sensor process 20 s later
@@ -105,7 +103,7 @@ def extract() -> Path:
 
 def stock_dt() -> Path:
     """Split the stock DTBs (base SoC trees from boot.img, board overlays from dtbo.img) into
-    <work>/stock/{dtbs,dtbos}, decompile them, and refresh the two kept in docs/stock-dt."""
+    <work>/stock/{dtbs,dtbos} and decompile them."""
     host.ensure(host.require_tools(["unpack_bootimg", "dtc"]))
     images = _images()
     stock = load().work / "stock"
@@ -121,10 +119,6 @@ def stock_dt() -> Path:
             path.write_bytes(dtb)
             run(["dtc", "-I", "dtb", "-O", "dts", "-q", "-o", str(path.with_suffix(".dts")),
                  str(path)], stdin=subprocess.DEVNULL)
-    docs = REPO / "docs/stock-dt"
-    docs.mkdir(exist_ok=True)
-    for src, dst in STOCK_DT_DOCS.items():
-        shutil.copy(stock / src, docs / dst)
     return stock
 
 

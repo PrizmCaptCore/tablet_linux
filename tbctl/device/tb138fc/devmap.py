@@ -1,16 +1,18 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Device map of the stock board overlay (docs/stock-devmap.txt): per device node its bus,
+"""Device map of the stock board overlay (out/stock-devmap.txt): per device node its bus,
 compatible, status, reg/interrupts, GPIOs and supplies, with references resolved through the
 overlay's __fixups__ and local phandles, and PMIC regulators named as in mainline."""
 from __future__ import annotations
 
 import re
 
-from tbctl.core.config import REPO
+from pathlib import Path
 
-STOCK_DT = REPO / "docs" / "stock-dt"
-OVERLAY = STOCK_DT / "overlay-kona-mtp-0x10008.dts"
-OUTPUT = REPO / "docs" / "stock-devmap.txt"
+from tbctl.core.config import load
+from tbctl.core.process import BuildError
+
+# decompiled by `tbctl firmware stock-dt`: dtbo entry ovl04 is this board (kona MTP, 0x10008)
+OVERLAY = "stock/dtbos/ovl04.dts"
 
 # stock regulator label -> mainline name (sm8250 boards: PM8150 = "a", PM8150L = "c")
 MAINLINE_REGULATORS = {"pm8150_l": "vreg_l{n}a", "pm8150a_l": "vreg_l{n}c", "pm8150l_l": "vreg_l{n}c",
@@ -63,7 +65,13 @@ def device_map(overlay: str) -> list[tuple[str, ...]]:
     return rows
 
 
-def generate() -> int:
-    rows = device_map(OVERLAY.read_text(encoding="utf-8"))
-    OUTPUT.write_text("".join(" | ".join(r) + "\n" for r in rows), encoding="utf-8", newline="\n")
-    return len(rows)
+def generate() -> Path:
+    cfg = load()
+    overlay = cfg.work / OVERLAY
+    if not overlay.is_file():
+        raise BuildError(f"{overlay} missing (run `tbctl firmware stock-dt`)")
+    rows = device_map(overlay.read_text(encoding="utf-8"))
+    out = cfg.out / "stock-devmap.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("".join(" | ".join(r) + "\n" for r in rows), encoding="utf-8", newline="\n")
+    return out

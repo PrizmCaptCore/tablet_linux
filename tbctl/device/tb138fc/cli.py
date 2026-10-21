@@ -11,10 +11,10 @@
     tbctl initramfs                    out/initramfs.cpio.gz (Linux)
     tbctl bootimg                      out/boot.img from the kernel tree + initramfs (Linux)
     tbctl firmware extract             stock QFIL package -> <work>/stock-fw (Linux)
-    tbctl firmware stock-dt            stock DTBs -> <work>/stock, docs/stock-dt (Linux)
+    tbctl firmware stock-dt            stock DTBs -> <work>/stock, decompiled (Linux)
     tbctl firmware package             out/firmware-tb138fc.tar.gz (Linux)
     tbctl firmware hexagonfs           out/hexagonfs-tb138fc.tar.gz, SLPI sensor files (Linux)
-    tbctl firmware devmap              docs/stock-devmap.txt from the decompiled stock overlay
+    tbctl firmware devmap              out/stock-devmap.txt from the decompiled stock overlay (Linux)
 """
 from __future__ import annotations
 
@@ -77,8 +77,8 @@ def register(sub: argparse._SubParsersAction) -> None:
                               ("hexagonfs", "SLPI sensor file tree tarball", firmware.hexagonfs)):
         fc = fcmds.add_parser(name, help=help_)
         fc.set_defaults(func=lambda a, func=func: print(func()), runs_on="linux")
-    fd = fcmds.add_parser("devmap", help="device map of the stock overlay -> docs/stock-devmap.txt")
-    fd.set_defaults(func=lambda a: print(f"{devmap.OUTPUT}: {devmap.generate()} devices"))
+    fd = fcmds.add_parser("devmap", help="device map of the stock overlay -> out/stock-devmap.txt")
+    fd.set_defaults(func=lambda a: print(devmap.generate()), runs_on="linux")
 
     c = kcmds.add_parser("config", help="show kernel config symbols")
     c.add_argument("--tree", type=Path, help="kernel tree (default: <work>/linux)")

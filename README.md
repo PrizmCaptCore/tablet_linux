@@ -28,9 +28,6 @@ Pad Pro 12.6 (Q706F) ports. Everything is built and flashed with one tool, `tbct
 | RTC / clock | ✅ | PM8150 RTC is read-only: `tb138fc-rtc` keeps the offset (correct after the first NTP sync) |
 | System sleep (suspend) | ❌ | not verified; the sleep targets are masked |
 
-Details: [docs/HARDWARE.md](docs/HARDWARE.md) · history and lessons: [docs/PROGRESS.md](docs/PROGRESS.md) ·
-restoring Android / unbricking / bootloader unlock: [docs/RECOVERY.md](docs/RECOVERY.md)
-
 Several drivers come from outside mainline (vendored or patched, see `data/kernel/`), and only this
 one unit has been tested: other hardware revisions of the tablet may differ.
 
@@ -38,8 +35,7 @@ one unit has been tested: other hardware revisions of the tablet may differ.
 
 ### 1. What you need
 
-- **An unlocked bootloader.** ZUI 15 cannot be unlocked; the way that worked (EDL downgrade to
-  ZUI 14, then `fastboot flashing unlock`) is in [docs/RECOVERY.md](docs/RECOVERY.md).
+- **An unlocked bootloader.** ZUI 15 cannot be unlocked; the way that worked.
   Unlocking and flashing wipe the tablet, and Android stops booting (`dtbo_a` is erased).
 - **The stock ZUI 14 QFIL package**, extracted (its `image/` directory). Proprietary firmware
   (DSPs, GPU zap shader, amp tunings, sensor configs) is taken from it at build time and never
@@ -114,7 +110,7 @@ Development of the device files themselves:
 tbctl dts                              # regenerate data/dts/ after editing tbctl/device/tb138fc/dts.py
 tbctl panel driver                     # panel .c from template + init sequence
 tbctl firmware stock-dt                # stock DTBs → <work>/stock (for `tbctl panel init-sequence`)
-tbctl firmware devmap                  # docs/stock-devmap.txt from the stock overlay
+tbctl firmware devmap                  # out/stock-devmap.txt: bus/GPIO/supply map of the stock overlay
 tbctl kernel patches | config SYM...   # patch state, kernel config values
 tbctl rootfs inspect IMAGE             # summary of a built image
 ```
@@ -135,7 +131,6 @@ tbctl/                        the tool (Python)
       rootfs/                 overlay/ (device files in their install location), build/
                               (qbootctl, hexagonrpcd + patches, built inside the image)
   tablet_access/              ssh, fastboot, rescue shell, debug helpers
-docs/                         hardware notes, stock device map, decompiled stock DT, recovery
 config.example.toml           settings template (copy to config.toml)
 out/                          build outputs (ignored by git)
 ```

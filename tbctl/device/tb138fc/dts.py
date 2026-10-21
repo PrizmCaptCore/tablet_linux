@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The TB138FC devicetree, derived from the J716F one by a list of edits (stock-DT findings in
-docs/HARDWARE.md). Output: dts/sm8250-lenovo-tb138fc.dts.
+"""The TB138FC devicetree, derived from the J716F one by a list of edits (findings from the
+decompiled stock DT, `tbctl firmware stock-dt`). Output: dts/sm8250-lenovo-tb138fc.dts.
 
 The edits are exact-text replacements on the J716F source, so they fail loudly (assert)
 when the reference changes instead of silently producing a wrong tree.
