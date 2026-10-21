@@ -11,6 +11,8 @@ from pathlib import Path, PurePosixPath
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_FILE = REPO / "config.toml"
+# tablet login: ID=<user> and PW=<password> lines (ignored by git); TB_USER/TB_PASS override
+CREDENTIALS_FILE = REPO / ".env"
 
 
 @dataclass(frozen=True)
@@ -26,10 +28,20 @@ class Config:
     tablet_host: str
     tablet_user: str
     fastboot: str
+    # [rootfs]: defaults for `tbctl rootfs build` (hostname, locale, timezone, fonts, ...)
+    rootfs: dict
 
     @property
     def tablet_password(self) -> str:
-        return os.environ.get("TB_PASS", "alarm")
+        return os.environ.get("TB_PASS") or _credentials().get("PW") or "alarm"
+
+
+def _credentials() -> dict[str, str]:
+    if not CREDENTIALS_FILE.is_file():
+        return {}
+    pairs = (l.split("=", 1) for l in CREDENTIALS_FILE.read_text(encoding="utf-8").splitlines()
+             if "=" in l and not l.lstrip().startswith("#"))
+    return {k.strip(): v.strip().strip('"') for k, v in pairs}
 
 
 def build_user_home() -> Path:
@@ -72,6 +84,8 @@ def load() -> Config:
         wsl_distro=wsl.get("distro", ""),
         # TB_HOST: one-off override, e.g. the tablet's Wi-Fi address
         tablet_host=os.environ.get("TB_HOST") or tablet.get("host", "172.16.42.1"),
-        tablet_user=tablet.get("user", "alarm"),
+        tablet_user=os.environ.get("TB_USER") or _credentials().get("ID")
+        or tablet.get("user", "alarm"),
         fastboot=tablet.get("fastboot") or _default_fastboot(),
+        rootfs=data.get("rootfs", {}),
     )

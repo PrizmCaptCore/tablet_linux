@@ -14,13 +14,14 @@
     tbctl firmware stock-dt            stock DTBs -> <work>/stock, docs/stock-dt (Linux)
     tbctl firmware package             out/firmware-tb138fc.tar.gz (Linux)
     tbctl firmware hexagonfs           out/hexagonfs-tb138fc.tar.gz, SLPI sensor files (Linux)
+    tbctl firmware devmap              docs/stock-devmap.txt from the decompiled stock overlay
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from tbctl.device.tb138fc import bootimg, dts, firmware, initramfs, kernel, panel
+from tbctl.device.tb138fc import bootimg, devmap, dts, firmware, initramfs, kernel, panel
 
 
 def _dts(args: argparse.Namespace) -> None:
@@ -76,6 +77,8 @@ def register(sub: argparse._SubParsersAction) -> None:
                               ("hexagonfs", "SLPI sensor file tree tarball", firmware.hexagonfs)):
         fc = fcmds.add_parser(name, help=help_)
         fc.set_defaults(func=lambda a, func=func: print(func()), runs_on="linux")
+    fd = fcmds.add_parser("devmap", help="device map of the stock overlay -> docs/stock-devmap.txt")
+    fd.set_defaults(func=lambda a: print(f"{devmap.OUTPUT}: {devmap.generate()} devices"))
 
     c = kcmds.add_parser("config", help="show kernel config symbols")
     c.add_argument("--tree", type=Path, help="kernel tree (default: <work>/linux)")

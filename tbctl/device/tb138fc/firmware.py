@@ -179,7 +179,7 @@ def hexagonfs() -> Path:
       dsp                  <- dsp partition (dspso.bin)
       sensors/config       <- /vendor/etc/sensors/config
       sensors/registry     <- persist /sensors/registry/registry
-      sensors/sns_reg_version <- persist (seeds the writable registry, rootfs/install-hexagonrpcd.sh)
+      sensors/sns_reg_version <- persist (seeds the writable registry, rootfs/build/hexagonrpcd.sh)
       sensors/sns_reg.conf <- /vendor/etc/sensors/sns_reg_config
       socinfo              <- Android's /sys/devices/soc0 values
     """

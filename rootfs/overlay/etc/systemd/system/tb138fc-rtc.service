@@ -1,7 +1,7 @@
 [Unit]
 Description=Set the system clock from the RTC plus the saved offset
 DefaultDependencies=no
-# rtc-pm8xxx is built in (kernel/buildkernel.sh), so rtc0 exists before userspace
+# rtc-pm8xxx is built in (kernel/tb138fc.config), so rtc0 exists before userspace
 After=local-fs.target
 Before=systemd-timesyncd.service time-set.target sysinit.target
 Wants=time-set.target

@@ -80,7 +80,7 @@ def flash(partition: str, image: Path) -> None:
     if not image.is_file():
         raise BuildError(f"no such image: {image}")
     log(f"flashing {image} -> {partition}")
-    r = fastboot("flash", partition, str(image))
+    r = fastboot("flash", partition, str(image), timeout=3600)   # an 8 GB rootfs over USB 2
     if r.returncode != 0:
         raise BuildError(f"fastboot flash {partition} failed:\n{r.stderr.strip()}")
 

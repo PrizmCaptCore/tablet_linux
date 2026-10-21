@@ -65,7 +65,6 @@ pacman-key --populate archlinuxarm
 {drop_kernel}
 pacman -Syu --noconfirm
 pacman -S --noconfirm --needed $(pacman -Sgq gnome | grep -v -x {exclude}) {" ".join([*BASE_PACKAGES, *cfg.packages])}
-systemctl enable {" ".join([*BASE_SERVICES, *cfg.services])}
 echo {cfg.hostname} > /etc/hostname
 echo 'LANG={cfg.locale}' > /etc/locale.conf
 sed -i '{locale_sed}' /etc/locale.gen
@@ -109,6 +108,12 @@ def build(cfg: ImageConfig) -> None:
                 for font in cfg.fonts:
                     fonts.INSTALLERS[font](root, cfg)
                 apply_layers(root, cfg)
+                # after the layers: they may ship some of the units
+                in_chroot(root, "systemctl enable " + " ".join([*BASE_SERVICES, *cfg.services]))
+            # systemd-resolved is enabled: point at its stub (the tarball links resolv.conf)
+            resolv = root / "etc/resolv.conf"
+            resolv.unlink(missing_ok=True)
+            resolv.symlink_to("/run/systemd/resolve/stub-resolv.conf")
             run(["du", "-sh", str(root)])
     finalize(cfg)
     log(f"done: {cfg.output}" + (f" (sparse: {cfg.sparse})" if cfg.sparse else ""))

@@ -32,11 +32,11 @@ From `C:\Users\PrizmBlue\tb138fc\edl`, with `PYTHONUTF8=1` (the progress bar cra
 ```
 
 The rawprogram files leave `persist`, `fpinfo`, `frp`, `devinfo`, `modemst*`, `fsg`, `fsc` untouched
-(no filename), and the GPT layout matches the device (verified against `logs/printgpt.log`).
+(no filename), and the GPT layout matches the device (verified against the device's own GPT dump, which is not kept in the repo: it carries the serial).
 
 ## Device-unique partitions
 
-EDL dumps taken before any write are kept **outside the repo** (`$BACKUP` in env.sh, checksums in `SHA256SUMS`; never commit them):
+EDL dumps taken before any write are kept **outside the repo** (`[build] backup` in config.toml, checksums in `SHA256SUMS`; never commit them):
 `persist` (Wi-Fi/sensor calibration), `fpinfo` (Lenovo SN `<device serial>`, Wi-Fi/BT MACs),
 `frp` (last byte `01` = OEM unlock allowed), `devinfo`, `modemst1/2`, `fsg`, `fsc`.
 Restore one with: `edl.py w <partition> <file> --memory=ufs --loader=...prog_firehose_ddr.elf`.

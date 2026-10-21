@@ -1,0 +1,16 @@
+[Unit]
+Description=Server for FastRPC remote procedure calls from the Qualcomm SLPI (sensors)
+ConditionPathExists=/dev/fastrpc-sdsp
+Before=iio-sensor-proxy.service
+BindsTo=dev-fastrpc\x2dsdsp.device
+After=dev-fastrpc\x2dsdsp.device
+
+[Service]
+ExecStart=/usr/local/bin/hexagonrpcd -f /dev/fastrpc-sdsp -d sdsp -s -R /usr/share/qcom/sm8250/Lenovo/TB138FC
+Restart=always
+RestartSec=3
+User=fastrpc
+Group=fastrpc
+
+[Install]
+WantedBy=multi-user.target

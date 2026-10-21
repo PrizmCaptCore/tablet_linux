@@ -1,0 +1,15 @@
+[Match]
+Name=usb0
+
+[Network]
+Address=172.16.42.1/24
+DHCPServer=yes
+
+[DHCPServer]
+PoolOffset=2
+PoolSize=8
+
+# the PC side of the gadget has a fixed MAC: give it a fixed address (Moonlight host, ssh)
+[DHCPServerStaticLease]
+MACAddress=02:7b:13:8f:c0:02
+Address=172.16.42.6

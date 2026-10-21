@@ -3,7 +3,7 @@
 Source: stock ZUI 14 `boot.img` (header v2, embedded DTB, kona v2.1, msm-id 0x164/0x20001) +
 `dtbo.img` overlay for board-id 0x10008 ("kona MTP" — Lenovo reuses Qualcomm reference IDs).
 Decompiled copies: [stock-dt/](stock-dt/) (re-extract with `tbctl firmware stock-dt`).
-Per-device bus/GPIO/supply table: [stock-devmap.txt](stock-devmap.txt) (`tools/devmap.py`).
+Per-device bus/GPIO/supply table: [stock-devmap.txt](stock-devmap.txt) (`tbctl firmware devmap`).
 Mainline bus names: `qupv3_seN_i2c` → `&i2cN`, `qupv3_seN_spi` → `&spiN`;
 PMIC regulators `pm8150_lN` → `vreg_lNa`, `pm8150a_lN` → `vreg_lNc`.
 

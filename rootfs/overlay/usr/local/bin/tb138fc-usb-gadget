@@ -1,0 +1,12 @@
+#!/bin/sh
+G=/sys/kernel/config/usb_gadget/g1
+[ -d $G ] && exit 0
+mkdir -p $G && cd $G
+echo 0x1d6b > idVendor; echo 0x0103 > idProduct
+mkdir -p strings/0x409 functions/ncm.usb0 configs/c.1/strings/0x409
+echo TB138FC > strings/0x409/serialnumber; echo "TB138FC Linux" > strings/0x409/product
+# fixed MACs: a new random host MAC each boot would exhaust the DHCP pool
+echo 02:7b:13:8f:c0:01 > functions/ncm.usb0/dev_addr
+echo 02:7b:13:8f:c0:02 > functions/ncm.usb0/host_addr
+ln -s functions/ncm.usb0 configs/c.1/
+ls /sys/class/udc | head -1 > UDC

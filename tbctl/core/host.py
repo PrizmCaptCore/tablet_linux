@@ -8,6 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from tbctl.core.config import build_user_home
 from tbctl.core.process import BuildError
 
 
@@ -44,6 +45,19 @@ def require_aarch64_exec() -> list[str]:
 def ensure(problems: list[str]) -> None:
     if problems:
         raise BuildError("host not ready:\n  - " + "\n  - ".join(problems))
+
+
+def give_back(*paths: Path) -> None:
+    """Root runs (image builds) create work files: hand them to the user who owns the build
+    home, so later runs as that user can replace them."""
+    if os.geteuid() != 0:
+        return
+    st = build_user_home().stat()
+    for top in paths:
+        if not top.exists():
+            continue
+        for p in [top, *(top.rglob("*") if top.is_dir() else [])]:
+            os.lchown(p, st.st_uid, st.st_gid)
 
 
 def enter_private_mount_namespace() -> None:

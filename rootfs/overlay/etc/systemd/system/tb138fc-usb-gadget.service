@@ -1,0 +1,12 @@
+[Unit]
+Description=USB NCM debug gadget
+After=sys-kernel-config.mount
+Before=systemd-networkd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/tb138fc-usb-gadget
+
+[Install]
+WantedBy=multi-user.target

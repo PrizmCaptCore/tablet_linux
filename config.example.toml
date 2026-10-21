@@ -19,7 +19,14 @@ stock_firmware = ""
 # Distribution that runs the build steps when tbctl is started on Windows ("" = default).
 distro = ""
 
+[rootfs]
+# Defaults for `tbctl rootfs build` (command line options override them).
+# locale = "ko_KR.UTF-8"
+# timezone = "Asia/Seoul"
+# fonts = ["d2coding"]      # make D2Coding the desktop font everywhere
+
 [tablet]
 host = "172.16.42.1"      # USB NCM gadget address; TB_HOST=<Wi-Fi IP> overrides it once
-user = "alarm"            # password: TB_PASS environment variable (default "alarm")
+user = "alarm"            # login; a .env file next to this one (ID=..., PW=..., not in git)
+                          # or TB_USER / TB_PASS override it (password default "alarm")
 fastboot = ""             # "" = fastboot on PATH, else the Android SDK platform-tools copy

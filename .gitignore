@@ -16,3 +16,6 @@ build/
 
 # per-machine tbctl settings (template: config.example.toml)
 config.toml
+
+# Temporary files created by IDEs
+.env

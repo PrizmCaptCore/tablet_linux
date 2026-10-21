@@ -12,6 +12,8 @@ from tbctl.distro.archlinux.config import ImageConfig
 
 D2CODING_VERSION = "1.4.0"
 D2CODING_BUILD = "20261003"
+D2CODING_FILES = (f"D2Coding-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.ttf",
+                  f"D2CodingBold-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.ttf")   # not the ligature sets
 D2CODING_URL = ("https://github.com/naver/d2-coding-font/releases/download/"
                 f"VER{D2CODING_VERSION}/D2Coding-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.zip")
 
@@ -30,7 +32,7 @@ def install_d2coding(root: Path, cfg: ImageConfig) -> None:
     with zipfile.ZipFile(archive) as z:
         for name in z.namelist():
             base = Path(name).name
-            if base.endswith(".ttf") and base.startswith(("D2Coding-Ver", "D2CodingBold-Ver")):
+            if base in D2CODING_FILES:
                 (fonts / base).write_bytes(z.read(name))
             elif base == "OFL.txt":
                 (licenses / "OFL.txt").write_bytes(z.read(name))

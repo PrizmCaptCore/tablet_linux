@@ -1,0 +1,10 @@
+[Unit]
+Description=Mark the current A/B boot slot successful (qbootctl)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/qbootctl -m
+
+[Install]
+WantedBy=multi-user.target
