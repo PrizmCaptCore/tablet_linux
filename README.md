@@ -35,8 +35,10 @@ one unit has been tested: other hardware revisions of the tablet may differ.
 
 ### 1. What you need
 
-- **An unlocked bootloader.** ZUI 15 cannot be unlocked; the way that worked.
-  Unlocking and flashing wipe the tablet, and Android stops booting (`dtbo_a` is erased).
+- **An unlocked bootloader** that accepts `fastboot flash`. Unlocking is out of scope here:
+  this project starts from an already unlocked tablet.
+  Flashing replaces userdata (Android and its data are gone), and Android stops booting
+  (`dtbo_a` is erased).
 - **The stock ZUI 14 QFIL package**, extracted (its `image/` directory). Proprietary firmware
   (DSPs, GPU zap shader, amp tunings, sensor configs) is taken from it at build time and never
   committed.
