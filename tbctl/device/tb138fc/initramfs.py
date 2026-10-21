@@ -11,7 +11,8 @@ import subprocess
 from pathlib import Path
 
 from tbctl.core import host
-from tbctl.core.config import REPO, load
+from tbctl.core.config import load
+from tbctl.device.tb138fc import DATA
 from tbctl.core.fetch import download, file_digest
 from tbctl.core.process import BuildError, log, run
 
@@ -25,7 +26,7 @@ BUSYBOX_EXTRAS = "busybox-extras-1.37.0-r31.apk"
 BUSYBOX_EXTRAS_URL = f"{ALPINE}/main/aarch64/{BUSYBOX_EXTRAS}"
 
 HELPERS = ("rebootmode", "devmem")      # initramfs/src/<name>.c -> /bin/<name>
-INIT = REPO / "initramfs" / "init"
+INIT = DATA / "initramfs" / "init"
 MTIME = "2021-01-01 00:00:00 UTC"       # every entry gets this timestamp
 
 REQUIRED_TOOLS = ("tar", "cpio", "gzip", "touch", "aarch64-linux-gnu-gcc")
@@ -60,7 +61,7 @@ def build() -> Path:
         raise BuildError(f"busybox-extras missing after unpacking {extras.name}")
     for name in HELPERS:
         run(["aarch64-linux-gnu-gcc", "-static", "-O2", "-o", str(stage / "bin" / name),
-             str(REPO / "initramfs/src" / f"{name}.c")])
+             str(DATA / "initramfs/src" / f"{name}.c")])
     shutil.copy(INIT, stage / "init")
     (stage / "init").chmod(0o755)
 

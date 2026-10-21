@@ -10,9 +10,9 @@ from __future__ import annotations
 import difflib
 import re
 
-from tbctl.core.config import REPO
+from tbctl.device.tb138fc import DATA
 
-DTS_DIR = REPO / "dts"
+DTS_DIR = DATA / "dts"
 REFERENCE = DTS_DIR / "ref" / "sm8250-lenovo-j716f.dts"
 OUTPUT = DTS_DIR / "sm8250-lenovo-tb138fc.dts"
 

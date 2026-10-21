@@ -134,7 +134,6 @@ rootfs/                   overlay/ (device files in their install location: serv
                           UCM, USB gadget, ...), build/ (qbootctl, hexagonrpcd + patches,
                           built from source inside the image)
 docs/                     hardware notes, stock device map, decompiled stock DT, recovery
-logs/regs/                display register dumps (bootloader vs msm, boot vs resume)
 config.example.toml       settings template (copy to config.toml)
 out/                      build outputs (ignored by git)
 ```

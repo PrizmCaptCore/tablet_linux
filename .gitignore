@@ -3,11 +3,11 @@ __pycache__/
 *.pyc
 
 # Device-unique data must never be committed: partition backups (IMEI/EFS, FRP, calibration,
-# MACs) live in E:\windows_project\secrets\tb138fc-backup, and raw boot/bootloader logs
-# carry the serial number. Register dumps in logs/regs/ are fine.
+# MACs) live outside the repo ([build] backup in config.toml), and boot/bootloader logs
+# carry the serial number.
 backup/
 secrets/
-logs/*.log
+logs/
 *.img
 
 # Python packaging byproducts
@@ -17,5 +17,5 @@ build/
 # per-machine tbctl settings (template: config.example.toml)
 config.toml
 
-# Temporary files created by IDEs
+# tablet login (ID=, PW=) read by tbctl
 .env

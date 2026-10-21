@@ -11,7 +11,8 @@ import tempfile
 from pathlib import Path
 
 from tbctl.core import host
-from tbctl.core.config import REPO, load
+from tbctl.core.config import load
+from tbctl.device.tb138fc import DATA
 from tbctl.core.fetch import download, file_digest
 from tbctl.core.process import BuildError, log, run, run_filtered
 
@@ -21,8 +22,8 @@ KERNEL_URL = f"https://cdn.kernel.org/pub/linux/kernel/v{_MAJOR}.x/linux-{KERNEL
 KERNEL_SUMS_URL = f"https://cdn.kernel.org/pub/linux/kernel/v{_MAJOR}.x/sha256sums.asc"
 
 DTS_NAME = "sm8250-lenovo-tb138fc"
-PATCH_DIR = REPO / "kernel" / "patches"
-CONFIG_FRAGMENT = REPO / "kernel" / "tb138fc.config"
+PATCH_DIR = DATA / "kernel" / "patches"
+CONFIG_FRAGMENT = DATA / "kernel" / "tb138fc.config"
 # patches already applied to a tree, one file name per line (a reverse dry-run cannot tell
 # for series whose patches touch the same lines)
 APPLIED_RECORD = ".tb138fc-patches"
@@ -121,13 +122,13 @@ def _insert_once(path: Path, marker: str, text: str, before: str | None = None) 
 def install_out_of_tree(tree: Path) -> None:
     """Devicetree, RM692H0 panel driver and CS35L43 amp driver into the kernel tree."""
     qcom = tree / "arch/arm64/boot/dts/qcom"
-    shutil.copy(REPO / "dts" / f"{DTS_NAME}.dts", qcom)
+    shutil.copy(DATA / "dts" / f"{DTS_NAME}.dts", qcom)
     _insert_once(qcom / "Makefile", f"{DTS_NAME}.dtb",
                  f"dtb-$(CONFIG_ARCH_QCOM)\t+= {DTS_NAME}.dtb\n",
                  before=None)   # placement within the list does not matter for the build
 
     panel = tree / "drivers/gpu/drm/panel"
-    shutil.copy(REPO / "kernel/panel/panel-raydium-rm692h0.c", panel)
+    shutil.copy(DATA / "kernel/panel/panel-raydium-rm692h0.c", panel)
     (panel / "Kconfig.tb138fc").write_text(
         "config DRM_PANEL_RAYDIUM_RM692H0\n"
         '\ttristate "Raydium RM692H0 dual-DSI panel (Lenovo TB138FC)"\n'
@@ -142,8 +143,8 @@ def install_out_of_tree(tree: Path) -> None:
 
     codecs = tree / "sound/soc/codecs"
     for name in ("cs35l43.c", "cs35l43.h", "cs35l43-i2c.c", "cs35l43-tables.c"):
-        shutil.copy(REPO / "kernel/cs35l43" / name, codecs)
-    shutil.copy(REPO / "kernel/cs35l43/sound-cs35l43.h", tree / "include/sound/cs35l43.h")
+        shutil.copy(DATA / "kernel/cs35l43" / name, codecs)
+    shutil.copy(DATA / "kernel/cs35l43/sound-cs35l43.h", tree / "include/sound/cs35l43.h")
     _insert_once(codecs / "Kconfig", "config SND_SOC_CS35L43\n",
                  "config SND_SOC_CS35L43\n\ttristate\n\tselect SND_SOC_WM_ADSP\n\n"
                  "config SND_SOC_CS35L43_I2C\n\ttristate \"Cirrus Logic CS35L43 CODEC (I2C)\"\n"

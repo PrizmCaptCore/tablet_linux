@@ -66,7 +66,7 @@ Final configuration: full stock init sequence (lmdpdg `--dumb-dcs`), command mod
 with `qcom,sync-dual-dsi`, 60 Hz mode with per-link porches doubled (msm halves them).
 
 ### How the DSC was found
-Dumped the display registers twice with `tools/disp-regdump.sh` (`logs/regs/`): once with msm
+Dumped the display registers twice with `tools/disp-regdump.sh` (the dumps lived in `logs/regs/`, since removed; see git history): once with msm
 blacklisted (bootloader state, known good) and once under msm, then diffed. Bootloader:
 `CTL_DSC_ACTIVE=3`, DSI stream word count 1281 bytes for 1280 pixels (3:1). That one diff
 explained hours of noise/mirroring experiments.

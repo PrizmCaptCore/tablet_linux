@@ -15,15 +15,16 @@ import shutil
 from dataclasses import replace
 from pathlib import Path
 
-from tbctl.core.config import REPO, load
+from tbctl.core.config import load
+from tbctl.device.tb138fc import DATA
 from tbctl.core.host import give_back
 from tbctl.core.process import BuildError, run
 from tbctl.device.tb138fc import kernel
 from tbctl.distro.archlinux.config import ImageConfig
 
-OVERLAY = REPO / "rootfs" / "overlay"
-BUILD_SCRIPTS = (REPO / "rootfs/build/qbootctl.sh", REPO / "rootfs/build/hexagonrpcd.sh")
-HEXAGONRPCD_PATCHES = REPO / "rootfs/build/hexagonrpcd-patches"
+OVERLAY = DATA / "rootfs" / "overlay"
+BUILD_SCRIPTS = (DATA / "rootfs/build/qbootctl.sh", DATA / "rootfs/build/hexagonrpcd.sh")
+HEXAGONRPCD_PATCHES = DATA / "rootfs/build/hexagonrpcd-patches"
 EXECUTABLE_DIRS = ("usr/local/bin",)
 # links git cannot be trusted with (Windows checkouts turn symlinks into text files)
 SYMLINKS = {
@@ -67,7 +68,7 @@ def _stage_layer(tree: Path) -> Path:
         os.symlink(target, stage / link)
     for name in STATIC_HELPERS:
         run(["aarch64-linux-gnu-gcc", "-static", "-O2", "-o", str(stage / "usr/local/bin" / name),
-             str(REPO / "initramfs/src" / f"{name}.c")])
+             str(DATA / "initramfs/src" / f"{name}.c")])
     shutil.copytree(HEXAGONRPCD_PATCHES, stage / "tmp/hexagonrpcd-patches")
     return stage
 

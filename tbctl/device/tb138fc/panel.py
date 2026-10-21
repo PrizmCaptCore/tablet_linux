@@ -13,10 +13,11 @@ import sys
 from pathlib import Path
 
 from tbctl.core import host
-from tbctl.core.config import REPO, load
+from tbctl.core.config import load
+from tbctl.device.tb138fc import DATA
 from tbctl.core.process import BuildError, log, run
 
-PANEL_DIR = REPO / "kernel" / "panel"
+PANEL_DIR = DATA / "kernel" / "panel"
 TEMPLATE = PANEL_DIR / "panel-raydium-rm692h0.c.in"
 INIT_SEQUENCE = PANEL_DIR / "rm692h0-init.inc"
 DRIVER = PANEL_DIR / "panel-raydium-rm692h0.c"
