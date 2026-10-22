@@ -45,6 +45,7 @@ SERVICES = (
     "tb138fc-usb-gadget.service",     # USB NCM debug link
     "tb138fc-boot-success.service",   # mark slot a successful (abl)
     "hexagonrpcd-sdsp.service",       # SLPI sensors
+    "tb138fc-power-key.service",      # power key: screen toggle / power-off dialog
 )
 DEFAULTS = {"hostname": "tb138fc", "label": "tb138fc-root"}
 
@@ -77,6 +78,7 @@ def _finish_script(kver: str) -> Path:
     script = load().work / "device-finish.sh"
     script.write_text("set -e\n"
                       f"depmod {kver}\n"
+                      "dconf update\n"
                       "rm -rf /tmp/hexagonrpcd-patches\n")
     return script
 

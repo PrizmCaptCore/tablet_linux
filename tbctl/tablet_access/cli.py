@@ -27,17 +27,26 @@ def _run(args: argparse.Namespace) -> int:
         return s.run(_command(args), root=args.root, timeout=args.timeout)
 
 
+def _remote(path: str) -> str:
+    """A tablet path must be absolute POSIX. Git Bash rewrites /tmp, /home/... arguments into
+    Windows paths before tbctl sees them."""
+    if not path.startswith("/"):
+        raise BuildError(f"tablet path {path!r} is not an absolute Linux path"
+                         " (from Git Bash: set MSYS_NO_PATHCONV=1 or write //tmp)")
+    return path
+
+
 def _push(args: argparse.Namespace) -> int:
     with ssh.Session() as s:
         for f in args.files:
-            dst = str(PurePosixPath(args.dir) / f.name)
+            dst = str(PurePosixPath(_remote(args.dir)) / f.name)
             s.put(f, dst)
             print(f"{f} -> {dst} ({f.stat().st_size} bytes)")
     return 0
 
 
 def _pull(args: argparse.Namespace) -> int:
-    local = args.local or Path(PurePosixPath(args.remote).name)
+    local = args.local or Path(PurePosixPath(_remote(args.remote)).name)
     with ssh.Session() as s:
         s.get(args.remote, local)
     print(f"{args.remote} -> {local}")
@@ -115,7 +124,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     rp.add_argument("file", type=Path)
     rp.add_argument("remote")
     rp.add_argument("--mode", default="755")
-    rp.set_defaults(func=lambda args: print(rescue.push(args.file, args.remote, args.mode)))
+    rp.set_defaults(func=lambda args: print(rescue.push(args.file, _remote(args.remote), args.mode)))
 
     d = sub.add_parser("debug", help="debug helpers")
     dcmds = d.add_subparsers(dest="command", required=True)
