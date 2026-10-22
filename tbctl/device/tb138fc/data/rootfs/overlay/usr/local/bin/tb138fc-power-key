@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Power key, phone style: a short press turns the screen off (and on again), holding it
+opens GNOME's power-off dialog. GNOME's own handling is set to 'nothing' (dconf
+10-tb138fc-power-key), so this service owns the key; system sleep is not available anyway.
+"""
+import glob
+import os
+import select
+import struct
+import subprocess
+import sys
+
+DEVICE_NAME = "pm8941_pwrkey"
+EV_KEY, KEY_POWER = 1, 116
+LONG_PRESS = 1.0                      # seconds held before the power-off dialog opens
+EVENT = struct.Struct("llHHi")        # struct input_event on 64-bit: time, type, code, value
+SCREEN_ON, SCREEN_OFF = 0, 3          # org.gnome.Mutter.DisplayConfig PowerSaveMode
+
+
+def find_device():
+    for name in glob.glob("/sys/class/input/event*/device/name"):
+        with open(name) as f:
+            if f.read().strip() == DEVICE_NAME:
+                return "/dev/input/" + name.split("/")[4]
+    sys.exit(f"no {DEVICE_NAME} input device")
+
+
+def active_session():
+    """(user, uid) of the active session on seat0: the logged-in user, or GDM's greeter."""
+    def show(*args):
+        return subprocess.run(["loginctl", *args, "--value"], capture_output=True,
+                              text=True).stdout.split()
+    sid = show("show-seat", "seat0", "-p", "ActiveSession")
+    if not sid:
+        return None
+    info = show("show-session", sid[0], "-p", "Name", "-p", "User")
+    return (info[1], info[0]) if len(info) == 2 else None
+
+
+def gdbus(*args):
+    session = active_session()
+    if session is None:
+        return ""
+    user, uid = session
+    return subprocess.run(
+        ["runuser", "-u", user, "--", "env", f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus",
+         "gdbus", "call", "--session", *args], capture_output=True, text=True, timeout=10).stdout
+
+
+def toggle_screen():
+    display = ["--dest", "org.gnome.Mutter.DisplayConfig", "--object-path", "/org/gnome/Mutter/DisplayConfig",
+               "--method"]
+    mode = gdbus(*display, "org.freedesktop.DBus.Properties.Get", "org.gnome.Mutter.DisplayConfig",
+                 "PowerSaveMode")
+    target = SCREEN_ON if mode.strip() and "<0>" not in mode else SCREEN_OFF
+    gdbus(*display, "org.freedesktop.DBus.Properties.Set", "org.gnome.Mutter.DisplayConfig",
+          "PowerSaveMode", f"<int32 {target}>")
+
+
+def power_dialog():
+    # wake the screen first, so the dialog is visible
+    gdbus("--dest", "org.gnome.Mutter.DisplayConfig", "--object-path", "/org/gnome/Mutter/DisplayConfig",
+          "--method", "org.freedesktop.DBus.Properties.Set", "org.gnome.Mutter.DisplayConfig",
+          "PowerSaveMode", f"<int32 {SCREEN_ON}>")
+    gdbus("--dest", "org.gnome.SessionManager", "--object-path", "/org/gnome/SessionManager",
+          "--method", "org.gnome.SessionManager.Shutdown")
+
+
+def main():
+    fd = os.open(find_device(), os.O_RDONLY)
+    pressed = False
+    while True:
+        # while the key is held, wait at most LONG_PRESS for its release
+        ready, _, _ = select.select([fd], [], [], LONG_PRESS if pressed else None)
+        if not ready:
+            pressed = False
+            power_dialog()
+            continue
+        for off in range(0, len(data := os.read(fd, EVENT.size * 16)), EVENT.size):
+            _, _, etype, code, value = EVENT.unpack_from(data, off)
+            if etype != EV_KEY or code != KEY_POWER:
+                continue
+            if value == 1:
+                pressed = True
+            elif value == 0 and pressed:       # released before LONG_PRESS
+                pressed = False
+                toggle_screen()
+
+
+if __name__ == "__main__":
+    main()

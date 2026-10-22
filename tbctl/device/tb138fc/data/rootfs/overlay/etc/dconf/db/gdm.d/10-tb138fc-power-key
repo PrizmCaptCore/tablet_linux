@@ -1,0 +1,3 @@
+# tb138fc-power-key.service handles the power key (screen toggle / power-off dialog)
+[org/gnome/settings-daemon/plugins/power]
+power-button-action='nothing'

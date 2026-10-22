@@ -1,0 +1,11 @@
+[Unit]
+Description=Power key: short press toggles the screen, long press opens the power-off dialog
+After=systemd-logind.service
+
+[Service]
+ExecStart=/usr/local/bin/tb138fc-power-key
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target
