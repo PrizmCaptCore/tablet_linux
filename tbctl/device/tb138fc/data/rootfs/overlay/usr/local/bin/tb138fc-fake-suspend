@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Stand-in for system suspend (systemd-suspend.service, see its drop-in): turn the panel off
+and wait for a power key press, then return.
+
+System sleep is not verified on this port, but Steam's game mode puts the device to sleep on a
+power key press and only redraws once logind reports the resume. logind sends Steam the usual
+PrepareForSleep before and after this service, so to Steam this is a normal suspend and resume;
+the device stays up with the panel off. /run/tb138fc-fake-suspend tells tb138fc-power-key to
+leave the waking press alone.
+"""
+import glob
+import os
+import select
+import struct
+import time
+
+BACKLIGHT = "/sys/class/backlight/ae94000.dsi.0"
+FLAG = "/run/tb138fc-fake-suspend"
+EV_KEY, KEY_POWER = 1, 116
+EVENT = struct.Struct("llHHi")
+FB_BLANK_UNBLANK, FB_BLANK_POWERDOWN = 0, 4
+
+
+def power_key_device():
+    for name in glob.glob("/sys/class/input/event*/device/name"):
+        with open(name) as f:
+            if f.read().strip() == "pm8941_pwrkey":
+                return "/dev/input/" + name.split("/")[4]
+    return None
+
+
+def write(attr, value):
+    try:
+        with open(os.path.join(BACKLIGHT, attr), "w") as f:
+            f.write(str(value))
+    except OSError:
+        pass
+
+
+def wait_for_press(device):
+    """Block until the power key is pressed and released."""
+    fd = os.open(device, os.O_RDONLY)
+    try:
+        while True:
+            select.select([fd], [], [])
+            data = os.read(fd, EVENT.size * 16)
+            for off in range(0, len(data), EVENT.size):
+                _, _, etype, code, value = EVENT.unpack_from(data, off)
+                if etype == EV_KEY and code == KEY_POWER and value == 0:
+                    return
+    finally:
+        os.close(fd)
+
+
+def main():
+    with open(os.path.join(BACKLIGHT, "brightness")) as f:
+        brightness = f.read().strip()
+    open(FLAG, "w").close()
+    try:
+        write("bl_power", FB_BLANK_POWERDOWN)
+        write("brightness", 0)
+        device = power_key_device()
+        if device:
+            wait_for_press(device)
+        else:
+            time.sleep(5)          # no key to wait for: come back rather than hang
+    finally:
+        write("brightness", brightness)
+        write("bl_power", FB_BLANK_UNBLANK)
+        # keep the flag a moment so tb138fc-power-key skips the waking press too
+        time.sleep(1)
+        os.unlink(FLAG)
+
+
+if __name__ == "__main__":
+    main()

@@ -29,9 +29,8 @@ EXECUTABLE_DIRS = ("usr/local/bin",)
 # links git cannot be trusted with (Windows checkouts turn symlinks into text files)
 SYMLINKS = {
     "usr/share/alsa/ucm2/conf.d/sm8250/Lenovo-TB138FC.conf": "../../Lenovo/TB138FC/TB138FC.conf",
-    # system sleep is not verified on this port (masked since bring-up): logind must not try it
-    **{f"etc/systemd/system/{t}.target": "/dev/null"
-       for t in ("sleep", "suspend", "hibernate", "hybrid-sleep")},
+    # no hibernation (no swap partition); suspend is the panel-off stand-in tb138fc-fake-suspend
+    **{f"etc/systemd/system/{t}.target": "/dev/null" for t in ("hibernate", "hybrid-sleep")},
 }
 STATIC_HELPERS = ("regdump",)           # initramfs/src/<name>.c -> /usr/local/bin/<name>
 

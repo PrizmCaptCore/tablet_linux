@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Power key, phone style: a short press locks the session and turns the screen off (a second
-press turns it on, at the lock screen), holding it opens GNOME's power-off dialog. GNOME's own handling is set to 'nothing' (dconf
+press turns it on, at the lock screen), holding it opens GNOME's power-off dialog. In game mode
+(gamescope session) both presses go to Steam, as SteamOS's power button handler does. GNOME's own handling is set to 'nothing' (dconf
 10-tb138fc-power-key), so this service owns the key; system sleep is not available anyway.
 """
 import glob
@@ -16,6 +17,7 @@ EV_KEY, KEY_POWER = 1, 116
 LONG_PRESS = 1.0                      # seconds held before the power-off dialog opens
 EVENT = struct.Struct("llHHi")        # struct input_event on 64-bit: time, type, code, value
 SCREEN_ON, SCREEN_OFF = 0, 3          # org.gnome.Mutter.DisplayConfig PowerSaveMode
+FAKE_SUSPEND_FLAG = "/run/tb138fc-fake-suspend"
 
 
 def find_device():
@@ -54,12 +56,36 @@ def gdbus(*args, timeout=5):
         return ""
 
 
+def steam_power_press(kind):
+    """Game mode: hand the press to Steam the way SteamOS's power button handler does
+    (steam://shortpowerpress sleeps, steam://longpowerpress opens the power menu). True when a
+    gamescope session runs Steam."""
+    session = active_session()
+    if session is None:
+        return False
+    user, uid = session
+    home = os.path.expanduser(f"~{user}")
+    steam = f"{home}/.local/share/Steam-arm64/steamrtarm64/steam"
+    if not (os.path.exists(f"/run/user/{uid}/gamescope-environment") and os.access(steam, os.X_OK)):
+        return False
+    try:
+        # the client finds the running instance through ~/.steam, so HOME must be the user's
+        subprocess.run(["runuser", "-u", user, "--", "env", f"HOME={home}", steam, "-ifrunning",
+                        f"steam://{kind}powerpress"],
+                       cwd=os.path.dirname(os.path.dirname(steam)), capture_output=True, timeout=20)
+    except subprocess.TimeoutExpired:
+        pass
+    return True
+
+
 def toggle_screen():
     display = ["--dest", "org.gnome.Mutter.DisplayConfig", "--object-path", "/org/gnome/Mutter/DisplayConfig",
                "--method"]
     mode = gdbus(*display, "org.freedesktop.DBus.Properties.Get", "org.gnome.Mutter.DisplayConfig",
                  "PowerSaveMode")
-    target = SCREEN_ON if mode.strip() and "<0>" not in mode else SCREEN_OFF
+    if not mode.strip():
+        return      # no GNOME session (game mode: Steam handles the key, see tb138fc-fake-suspend)
+    target = SCREEN_ON if "<0>" not in mode else SCREEN_OFF
     if target == SCREEN_OFF:
         # Lock() (SetActive only raises the shield, swipeable without a password); gnome-shell
         # locks at once but does not answer the call, so do not wait for the reply. No-op at the
@@ -88,17 +114,22 @@ def main():
         ready, _, _ = select.select([fd], [], [], LONG_PRESS if pressed else None)
         if not ready:
             pressed = False
-            power_dialog()
+            if not steam_power_press("long"):
+                power_dialog()
             continue
         for off in range(0, len(data := os.read(fd, EVENT.size * 16)), EVENT.size):
             _, _, etype, code, value = EVENT.unpack_from(data, off)
             if etype != EV_KEY or code != KEY_POWER:
                 continue
+            if os.path.exists(FAKE_SUSPEND_FLAG):
+                pressed = False            # this press wakes the panel (tb138fc-fake-suspend)
+                continue
             if value == 1:
                 pressed = True
             elif value == 0 and pressed:       # released before LONG_PRESS
                 pressed = False
-                toggle_screen()
+                if not steam_power_press("short"):
+                    toggle_screen()
 
 
 if __name__ == "__main__":

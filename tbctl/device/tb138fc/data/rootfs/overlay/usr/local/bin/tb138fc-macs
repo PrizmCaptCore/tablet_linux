@@ -6,6 +6,18 @@
 # Without a BD address the QCA6390 stays an "unconfigured controller" and bluetoothd ignores it.
 #   tb138fc-macs [bt|wifi]   (default: both). "bt" runs from udev whenever hci0 appears, so a
 #   re-probed controller (tb138fc-bt-watchdog) gets its address back too.
+
+# The QCA6390 has no address in its OTP: ath11k makes up a new permanent one (00:03:7F:12:xx:xx)
+# on every boot. GNOME and Steam pin saved Wi-Fi networks to the permanent address, so after a
+# reboot no saved network matches the device and each reconnect saves another copy. Unpin them
+# before NetworkManager starts (the [wifi] section only; this runs ahead of NetworkManager).
+if [ "${1:-wifi}" != bt ]; then
+	for f in /etc/NetworkManager/system-connections/*.nmconnection; do
+		[ -f "$f" ] && grep -q '^type=wifi' "$f" || continue
+		sed -i '/^\[wifi\]/,/^\[/{/^mac-address=/d}' "$f"
+	done
+fi
+
 dev=/dev/disk/by-partlabel/fpinfo
 [ -e "$dev" ] || exit 0
 
