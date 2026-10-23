@@ -1,0 +1,13 @@
+#!/bin/bash
+# Root (through pkexec, org.tb138fc.set-session): the session SDDM logs into next.
+# After CachyOS gamescope-session 1.1.6 (MIT, from Valve's SteamOS gamescope-session).
+set -e
+
+SESSION="${1:-gamescope-session.desktop}"
+case "$SESSION" in
+    gamescope-session.desktop|gnome.desktop) ;;
+    *) echo "steam-set-session: unknown session '$SESSION'" >&2; exit 1;;
+esac
+
+mkdir -p /etc/sddm.conf.d
+printf '[Autologin]\nSession=%s\n' "$SESSION" > /etc/sddm.conf.d/zz-steamos-autologin.conf

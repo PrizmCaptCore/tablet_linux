@@ -1,0 +1,15 @@
+[Unit]
+Description=Steam Launcher
+After=graphical-session.target
+PartOf=graphical-session.target
+After=xdg-desktop-portal.service
+
+[Service]
+ExecStart=/usr/local/lib/steamos/steam-launcher
+# the launcher does not forward signals: stop its child, let systemd kill the cgroup on timeout
+ExecStop=/bin/bash -c 'kill -TERM $(pgrep -P $MAINPID || echo $MAINPID)'
+KillSignal=SIGCONT
+KillMode=mixed
+TimeoutStopSec=60
+Type=exec
+EnvironmentFile=%t/gamescope-environment

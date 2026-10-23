@@ -1,0 +1,13 @@
+[Unit]
+Description=Next login goes back to game mode (steamos-session-select oneshot)
+PartOf=graphical-session.target
+After=graphical-session.target
+# only in the desktop session: game mode writes this file
+ConditionPathExists=!%t/gamescope-environment
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/pkexec /usr/local/lib/steamos/steam-set-session gamescope-session.desktop
+
+[Install]
+WantedBy=graphical-session.target

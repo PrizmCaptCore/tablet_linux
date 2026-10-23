@@ -1,0 +1,21 @@
+#!/bin/bash
+# Game mode session entry point (wayland-sessions/gamescope-session.desktop).
+# From CachyOS gamescope-session 1.1.6 (MIT, after Valve's SteamOS gamescope-session).
+
+# Leftovers of a previous session (the display manager killed us, user units kept running)
+systemctl --user stop gamescope-session.target
+systemctl --user stop graphical-session-pre.target
+systemctl --user reset-failed
+
+dbus-update-activation-environment --systemd DESKTOP_SESSION $(env | grep ^XDG_ | cut -d = -f 1)
+
+# xdg-desktop-portal: only gamescope-specific backends in this session
+systemctl --user set-environment XDG_DESKTOP_PORTAL_DIR=""
+
+trap 'systemctl --user stop gamescope-session.target' HUP INT TERM
+
+systemctl --user --wait start gamescope-session.target &
+wait
+logger "Gamescope Session Ended - Performing Final Cleanup"
+systemctl --user stop graphical-session-pre.target
+logger "Gamescope Session Ended - Cleanup Complete"

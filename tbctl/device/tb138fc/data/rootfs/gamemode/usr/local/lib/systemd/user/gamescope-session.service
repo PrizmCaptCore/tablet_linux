@@ -1,0 +1,20 @@
+[Unit]
+Description=Gamescope Session
+Before=graphical-session.target
+PartOf=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+RefuseManualStart=yes
+Before=xdg-desktop-portal.service
+
+[Service]
+TimeoutStartSec=5
+TimeoutStopSec=10
+ExecStart=/usr/local/lib/steamos/gamescope-session
+ExecStopPost=/usr/bin/bash -c '/usr/bin/rm -rf "$XDG_RUNTIME_DIR"/gamescope{.,-}* /tmp/gamescope-limiter*'
+Type=notify
+NotifyAccess=all
+# the display manager sets XDG_SESSION_TYPE=wayland, but apps under gamescope must use X11
+Environment="SRT_LOG_TO_JOURNAL=1" "XDG_SESSION_TYPE=x11"
+UnsetEnvironment=DISPLAY XAUTHORITY
+Slice=session.slice

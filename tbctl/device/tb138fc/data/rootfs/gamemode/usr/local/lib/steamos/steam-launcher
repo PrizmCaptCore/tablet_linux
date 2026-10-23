@@ -1,0 +1,5 @@
+#!/bin/bash
+# Steam in SteamOS mode (steam-launcher.service). The ARM64 client lives in
+# ~/.local/share/Steam-arm64; run-steam restarts it after self-updates (exit 42).
+# From CachyOS gamescope-session 1.1.6 (MIT, after Valve's SteamOS gamescope-session).
+exec "$HOME/.local/share/Steam-arm64/run-steam" -steamos3 -steampal -steamdeck -gamepadui

@@ -1,0 +1,69 @@
+#!/bin/bash
+# gamescope for the game mode session (gamescope-session.service).
+# From CachyOS gamescope-session 1.1.6 (MIT, after Valve's SteamOS gamescope-session), cut down
+# to what applies here: the Steam Deck/AMD-only knobs (RADV VRS, fan, LED, mura, HDR, VRR,
+# tearing, NIS, mangoapp, KDE theming) are left out. TB138FC: panel on DSI-1, Adreno/Turnip.
+
+tmpdir="$([[ -n ${XDG_RUNTIME_DIR+x} ]] && mktemp -p "$XDG_RUNTIME_DIR" -d -t gamescope.XXXXXXX)"
+socket="${tmpdir:+$tmpdir/startup.socket}"
+stats="${tmpdir:+$tmpdir/stats.pipe}"
+if [[ -z $tmpdir || -z ${XDG_RUNTIME_DIR+x} ]]; then
+	echo >&2 "!! Failed to find run directory for the stats/startup sockets (is \$XDG_RUNTIME_DIR set?)"
+	exit 0
+fi
+
+export SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS=0
+export GAMESCOPE_MODE_SAVE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/gamescope/modes.cfg"
+mkdir -p "$(dirname "$GAMESCOPE_MODE_SAVE_FILE")"
+touch "$GAMESCOPE_MODE_SAVE_FILE"
+
+# Steam client integration
+export STEAM_ENABLE_VOLUME_HANDLER=1
+export SRT_URLOPEN_PREFER_STEAM=1
+export STEAM_MULTIPLE_XWAYLANDS=1
+export STEAM_ALLOW_DRIVE_UNMOUNT=1
+export STEAM_LAUNCH_WRAPPER_SCOPE=1
+export QT_IM_MODULE=steam
+export GTK_IM_MODULE=Steam
+
+# gamescope WSI layer, and buffers handed over without waiting for idle
+export ENABLE_GAMESCOPE_WSI=1
+export vk_xwayland_wait_ready=false
+# msm KMS has no async (immediate) flips
+export GAMESCOPE_DISABLE_ASYNC_FLIPS=1
+export GAMESCOPE_LIMITER_FILE="$(mktemp /tmp/gamescope-limiter.XXXXXXXX)"
+export VKD3D_SWAPCHAIN_LATENCY_FRAMES=3
+
+ulimit -n 524288
+
+export GAMESCOPE_STATS="$stats"
+mkfifo -- "$stats"
+mkfifo -- "$socket"
+
+linkname="gamescope-stats"
+sessionlink="${XDG_RUNTIME_DIR:+$XDG_RUNTIME_DIR/}${linkname}"
+exec 9>"$sessionlink".lck
+if flock -n 9 && rm -f "$sessionlink" && ln -sf "$tmpdir" "$sessionlink"; then
+	echo >&2 "Claimed global gamescope stats session at \"$sessionlink\""
+fi
+
+# gamescope answers on the startup socket with its X and Wayland displays once it is up:
+# hand them to the units that follow (steam-launcher.service) and report ready
+read_gamescope_env() {
+	if read -r -t 3 response_x_display response_wl_display <> "$socket"; then
+		export DISPLAY="$response_x_display"
+		export GAMESCOPE_WAYLAND_DISPLAY="$response_wl_display"
+		env > "$XDG_RUNTIME_DIR"/gamescope-environment
+		systemd-notify --ready
+	fi
+}
+(read_gamescope_env &)
+
+exec gamescope \
+	--xwayland-count "${XWAYLAND_COUNT:-2}" \
+	--default-touch-mode "${TOUCH_MODE:-4}" \
+	--hide-cursor-delay "${HIDE_CURSOR_DELAY_MS:-3000}" \
+	--max-scale "${MAX_SCALE:-2}" \
+	--fade-out-duration "${FADE_OUT_DURATION_MS:-200}" \
+	-e -R "$socket" -T "$stats" \
+	-O "${OUTPUT_CONNECTOR:-*,DSI-1}"

@@ -35,7 +35,9 @@ SYMLINKS = {
 }
 STATIC_HELPERS = ("regdump",)           # initramfs/src/<name>.c -> /usr/local/bin/<name>
 
-PACKAGES = ("iio-sensor-proxy", "linux-firmware-qcom", "i2c-tools")
+PACKAGES = ("iio-sensor-proxy", "linux-firmware-qcom", "i2c-tools",
+            "vulkan-freedreno",   # Turnip: Vulkan on the Adreno 650 (mesa has GL only)
+            "zram-generator")     # zram swap, configured in overlay/etc/systemd
 SERVICES = (
     "tb138fc-rtc.service",            # sysinit: system clock from RTC + saved offset
     "tb138fc-rtc-save.path",

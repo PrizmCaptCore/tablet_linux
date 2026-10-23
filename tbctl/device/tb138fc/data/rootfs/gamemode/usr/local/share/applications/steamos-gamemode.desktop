@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Return to Game Mode
+Comment=Steam Big Picture on gamescope
+Exec=steamos-session-select gamescope
+Icon=input-gaming
+Terminal=false
+Type=Application
+Categories=Game;
+StartupNotify=false
