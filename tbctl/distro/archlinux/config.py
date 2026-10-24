@@ -2,6 +2,7 @@
 """What goes into the image."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,7 +17,7 @@ BASE_PACKAGES = (
     "pipewire-jack", "alsa-utils", "bluez", "bluez-utils",
     "mesa", "e2fsprogs", "usbutils", "vim",
 )
-BASE_SERVICES = ("gdm", "NetworkManager", "sshd", "systemd-networkd", "bluetooth")
+BASE_SERVICES = ("NetworkManager", "sshd", "systemd-networkd", "bluetooth")
 
 
 @dataclass
@@ -36,3 +37,8 @@ class ImageConfig:
     overlays: list[Path] = field(default_factory=list)        # directory trees copied to /
     overlay_tars: list[Path] = field(default_factory=list)    # tarballs extracted to /
     chroot_scripts: list[Path] = field(default_factory=list)  # run inside, after overlays
+    # functions called with the mounted root after the chroot scripts (chroot ready)
+    hooks: list[Callable[[Path], None]] = field(default_factory=list)
+    # (name, password): replaces the stock alarm account, root gets the same password
+    account: tuple[str, str] | None = None
+    display_manager: str = "gdm"      # its package must be installed (gdm is part of GNOME)

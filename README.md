@@ -1,35 +1,4 @@
-# Mainline Linux on Lenovo Xiaoxin Pad Pro 2022 (TB138FC)
-
-Arch Linux ARM + GNOME on the Snapdragon 870 (SM8250) Xiaoxin Pad Pro 2022, using a mainline
-kernel (7.2.11) and a device tree derived from the Xiaoxin Pad Pro 2021 (J716F) and
-Pad Pro 12.6 (Q706F) ports. Everything is built and flashed with one tool, `tbctl`.
-
-## Status
-
-| Block | State | Notes |
-|---|---|---|
-| Boot (abl → kernel) | ✅ | image flashed to `boot_a`; `dtbo_a` erased |
-| UFS storage | ✅ | |
-| USB (peripheral, NCM debug network) | ✅ | tablet `172.16.42.1` |
-| Display (RM692H0, dual DSI, DSC) | ✅ | msm DRM + `data/kernel/panel/panel-raydium-rm692h0.c`, command mode, 120 Hz (`refresh=60` option), DCS brightness 0-2047 |
-| GPU (Adreno 650) | ✅ | Freedreno/GBM; GNOME renders on the GPU |
-| Touchscreen (Goodix GT9966S) | ✅ | `goodix,gt9916` on spi0, GPIO chip-select |
-| Fuel gauge (bq27541) | ✅ | i2c15 |
-| Buttons | ✅ | power, volume up/down |
-| Arch Linux ARM + GNOME | ✅ | GDM, touch login |
-| Wi-Fi (QCA6390, ath11k) | ✅ | stock linux-firmware board-2.bin; NTP time sync |
-| Bluetooth (QCA6390) | ✅ | BD address from fpinfo; crash-loop watchdog; BLE keyboards (uhid) |
-| Remoteprocs (ADSP, CDSP, SLPI) | ✅ | stock firmware (`tbctl firmware package`) |
-| Sensors (SLPI: ICM4x6xx accel, AK0991x compass, light) | ✅ | hexagonrpcd (+registry write patches) → libssc → iio-sensor-proxy; auto-rotate verified |
-| Speakers (4× CS35L43, ADSP) | ✅ | vendored CS35L43 driver + factory calibration, primary MI2S, UCM in `data/rootfs/overlay/usr/share/alsa/ucm2/`; stereo verified |
-| Microphone (WCD938x analog, amic1) | ✅ | WCD938x on SoundWire + TX macro, UCM "Mic"; verified in GNOME |
-| Charging (PM8150B SMB5 main charger) | ✅ | qcom_smbx + SMB5 series (`data/kernel/patches` 0004-0013): 4.45 V float, 2.4 A; input follows Type-C/PD (5 V, up to 3 A) via `tb138fc-usb-icl`; no fast charge (SMB1396/1398 charge pumps) |
-| USB-C (PM8150B TCPM, NB7VPQ904M redriver) | ✅ | dual role: device (NCM debug) / host + OTG VBUS (USB-C earphones verified); PD sink 5 V; DP alt mode (external monitor): 4K30 over a 2-lane USB-C/HDMI hub, repeated plug/unplug OK |
-| RTC / clock | ✅ | PM8150 RTC is read-only: `tb138fc-rtc` keeps the offset (correct after the first NTP sync) |
-| System sleep (suspend) | ❌ | not verified; the sleep targets are masked |
-
-Several drivers come from outside mainline (vendored or patched, see `data/kernel/`), and only this
-one unit has been tested: other hardware revisions of the tablet may differ.
+# tablet-steamOS
 
 ## Installing
 
@@ -39,9 +8,6 @@ one unit has been tested: other hardware revisions of the tablet may differ.
   this project starts from an already unlocked tablet.
   Flashing replaces userdata (Android and its data are gone), and Android stops booting
   (`dtbo_a` is erased).
-- **The stock ZUI 14 QFIL package**, extracted (its `image/` directory). Proprietary firmware
-  (DSPs, GPU zap shader, amp tunings, sensor configs) is taken from it at build time and never
-  committed.
 - **EDL dumps of the device-unique partitions** (`persist` at least): the sensor registry is
   built from `persist.img`. Keep them outside the repository (they hold the serial number,
   MACs and calibration data).
@@ -65,7 +31,21 @@ the same commands work from PowerShell. From Git Bash, pass Linux paths with
 `MSYS_NO_PATHCONV=1` (or use relative paths): Git Bash rewrites `/home/...` arguments into
 Windows paths, and tbctl refuses those.
 
-### 3. Build
+### 3. Build and flash in one go
+
+```bash
+tbctl tb138fc full_install                   # every step below, game mode included; images in out/
+tbctl tb138fc full_install --wipe-userdata   # ... and flash them (replaces everything on the tablet)
+```
+
+The image boots straight into Steam (Big Picture on gamescope, SteamOS style); Steam's "Switch
+to Desktop" goes to GNOME and the "Return to Game Mode" app comes back. `--no-gamemode` builds
+the plain GNOME image instead, `--from STEP` resumes after a failure. The login is the `.env`
+account (`ID=` / `PW=`, root gets the same password) or `alarm` / `alarm` without one. Game mode
+adds gtk2 and a patched gamescope (built with makepkg inside the image) and FEX, all cached in
+`<work>/pkgcache` after the first build, plus Valve's ARM64 Steam client.
+
+### 3a. Build step by step
 
 ```bash
 tbctl firmware extract                 # stock QFIL package → <work>/stock-fw
@@ -75,6 +55,7 @@ tbctl kernel build                     # Image.gz, DTB, modules (~5 min)
 tbctl initramfs                        # out/initramfs.cpio.gz
 tbctl bootimg                          # out/boot.img
 tbctl rootfs build --device tb138fc    # out/rootfs.simg: Arch + GNOME + device layer (~12 min)
+                                       #   --gamemode: + Steam game mode
 ```
 
 Hostname, locale, timezone and fonts come from `[rootfs]` in `config.toml` (for example
@@ -89,7 +70,8 @@ tbctl flash boot                       # out/boot.img → boot_a
 tbctl flash rootfs --wipe-userdata     # out/rootfs.simg → userdata (~11 min over USB)
 ```
 
-First boot: log in as `alarm` / `alarm` (`root` / `root`) and change both. The USB cable doubles
+First boot: log in with the `.env` account, or as `alarm` / `alarm` (`root` / `root`) without
+one, and change those. The USB cable doubles
 as a network link (tablet `172.16.42.1`, sshd), which is how tbctl reaches the tablet.
 
 ## Working on a running tablet
@@ -130,8 +112,9 @@ tbctl/                        the tool (Python)
       kernel/                 tb138fc.config, patches/ (applied in order),
                               panel/ (RM692H0 driver), cs35l43/ (amp driver)
       initramfs/              init (switch to Arch, or rescue shell), static helper sources
-      rootfs/                 overlay/ (device files in their install location), build/
-                              (qbootctl, hexagonrpcd + patches, built inside the image)
+      rootfs/                 overlay/ (device files in their install location), gamemode/
+                              (Steam session, SDDM), build/ (qbootctl, hexagonrpcd, gamescope
+                              patches, built inside the image)
   tablet_access/              ssh, fastboot, rescue shell, debug helpers
 config.example.toml           settings template (copy to config.toml)
 out/                          build outputs (ignored by git)

@@ -51,6 +51,12 @@ SERVICES = (
 DEFAULTS = {"hostname": "tb138fc", "label": "tb138fc-root"}
 
 
+def gamemode(image: ImageConfig) -> ImageConfig:
+    """`image` (with this layer) plus game mode, see tbctl.device.tb138fc.gamemode."""
+    from tbctl.device.tb138fc import gamemode as gm   # imported on demand: Steam, FEX, makepkg
+    return gm.layer(image)
+
+
 def _stage_layer(tree: Path) -> Path:
     """The overlay as it lands in the image: normalized modes, symlinks, helpers, patches."""
     cfg = load()
@@ -72,6 +78,7 @@ def _stage_layer(tree: Path) -> Path:
         run(["aarch64-linux-gnu-gcc", "-static", "-O2", "-o", str(stage / "usr/local/bin" / name),
              str(DATA / "initramfs/src" / f"{name}.c")])
     shutil.copytree(HEXAGONRPCD_PATCHES, stage / "tmp/hexagonrpcd-patches")
+    (stage / "tmp").chmod(0o1777)   # copied over the image's /tmp: keep it world-writable
     return stage
 
 

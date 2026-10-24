@@ -16,10 +16,11 @@ from tbctl import doctor
 from tbctl.core import wsl
 from tbctl.core.process import BuildError
 from tbctl.device.tb138fc import cli as tb138fc_cli
+from tbctl.device.tb138fc import full_install
 from tbctl.distro.archlinux import cli as archlinux_cli
 from tbctl.tablet_access import cli as tablet_access_cli
 
-GROUPS = (doctor, archlinux_cli, tb138fc_cli, tablet_access_cli)
+GROUPS = (doctor, archlinux_cli, tb138fc_cli, tablet_access_cli, full_install)
 
 
 def main(argv: list[str] | None = None) -> int:

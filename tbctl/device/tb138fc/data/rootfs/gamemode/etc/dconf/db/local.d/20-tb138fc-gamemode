@@ -1,0 +1,4 @@
+# Game mode: GNOME is one of two sessions, so keep "Log Out" in the menu even with a single
+# user (the "Return to Game Mode" app is the usual way back, see steamos-session-select).
+[org/gnome/shell]
+always-show-log-out=true

@@ -2,6 +2,7 @@
 """`tbctl rootfs build|inspect`.
 
     tbctl rootfs build --device tb138fc        the tablet image: <work>/rootfs.img + out/rootfs.simg
+    tbctl rootfs build --device tb138fc --gamemode   ... booting into Steam (game mode)
     tbctl rootfs build -o plain.img            plain Arch Linux ARM + GNOME (any aarch64 board)
     tbctl rootfs inspect IMAGE
 
@@ -57,7 +58,16 @@ def _build(args: argparse.Namespace) -> None:
         overlay_tars=[p.resolve() for p in args.overlay_tars],
         chroot_scripts=[p.resolve() for p in args.chroot_scripts])
     if device:
+        # the login from .env (ID/PW) replaces alarm/alarm
+        if cfg.tablet_user != "alarm":
+            image.account = (cfg.tablet_user, cfg.tablet_password)
         image = device.layer(image)
+        if args.gamemode:
+            if not hasattr(device, "gamemode"):
+                raise SystemExit(f"tbctl rootfs build: no game mode for {args.device}")
+            image = device.gamemode(image)
+    elif args.gamemode:
+        raise SystemExit("tbctl rootfs build: --gamemode needs --device")
     build(image)
 
 
@@ -67,6 +77,8 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     b = cmds.add_parser("build", help="build an image (Linux, root)")
     b.add_argument("--device", choices=sorted(DEVICES), help="add the device layer")
+    b.add_argument("--gamemode", action="store_true",
+                   help="with --device: boot into Steam (gamescope), GNOME one switch away")
     b.add_argument("-o", "--output", type=Path,
                    help="raw ext4 image to create (default with --device: <work>/rootfs.img)")
     b.add_argument("--sparse", type=Path,

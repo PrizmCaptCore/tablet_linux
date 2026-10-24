@@ -73,6 +73,21 @@ ln -sf /usr/share/zoneinfo/{cfg.timezone} /etc/localtime
 echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/wheel
 usermod -aG wheel alarm
 """)
+    if cfg.account:
+        set_account(root, *cfg.account)
+
+
+def set_account(root: Path, name: str, password: str) -> None:
+    """Replace the stock alarm account; root gets the same password. The password goes in on
+    stdin (chpasswd), so only its hash lands in the image."""
+    if not name.replace("-", "").replace("_", "").isalnum() or ":" in password or "\n" in password:
+        raise BuildError(f"unusable account name or password for {name!r}")
+    in_chroot(root, f"""
+userdel -r alarm 2>/dev/null || true
+id {name} >/dev/null 2>&1 || useradd -m -G wheel -s /bin/bash {name}
+chpasswd
+""", stdin=f"{name}:{password}\nroot:{password}\n")
+    log(f"account {name} (stock alarm account removed)")
 
 
 def apply_layers(root: Path, cfg: ImageConfig) -> None:
@@ -108,8 +123,11 @@ def build(cfg: ImageConfig) -> None:
                 for font in cfg.fonts:
                     fonts.INSTALLERS[font](root, cfg)
                 apply_layers(root, cfg)
+                for hook in cfg.hooks:
+                    hook(root)
                 # after the layers: they may ship some of the units
-                in_chroot(root, "systemctl enable " + " ".join([*BASE_SERVICES, *cfg.services]))
+                in_chroot(root, "systemctl enable " + " ".join(
+                    [cfg.display_manager, *BASE_SERVICES, *cfg.services]))
             # systemd-resolved is enabled: point at its stub (the tarball links resolv.conf)
             resolv = root / "etc/resolv.conf"
             resolv.unlink(missing_ok=True)

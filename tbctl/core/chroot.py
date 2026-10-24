@@ -61,6 +61,8 @@ def chroot_ready(root: Path):
             run_quiet(["umount", "-l", str(root / d)])
 
 
-def in_chroot(root: Path, script: str) -> None:
-    """Run a bash script inside `root` (strict mode)."""
-    run(["chroot", str(root), "/bin/bash", "-eo", "pipefail", "-c", script])
+def in_chroot(root: Path, script: str, stdin: str | None = None) -> None:
+    """Run a bash script inside `root` (strict mode); `stdin` feeds it data that must not
+    appear in a command line (passwords)."""
+    run(["chroot", str(root), "/bin/bash", "-eo", "pipefail", "-c", script], input=stdin,
+        text=stdin is not None)
