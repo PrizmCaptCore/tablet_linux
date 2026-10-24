@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The tablet's Arch system over ssh/sftp (USB NCM 172.16.42.1, or its Wi-Fi address)."""
 from __future__ import annotations
 
 import os
@@ -23,7 +22,6 @@ def reachable(host: str, port: int = 22, timeout: float = 2) -> bool:
 
 
 class Session:
-    """One ssh connection: `with Session() as s: s.run("uptime")`."""
 
     def __init__(self, cfg: Config | None = None, timeout: float = 15):
         self.cfg = cfg or load()
@@ -31,10 +29,9 @@ class Session:
         self.client = None
 
     def __enter__(self) -> "Session":
-        import paramiko   # only the tablet commands need it
+        import paramiko
 
         self.client = paramiko.SSHClient()
-        # the host key changes on every rootfs rebuild; this is a point-to-point USB link
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             self.client.connect(self.cfg.tablet_host, username=self.cfg.tablet_user,
@@ -50,8 +47,6 @@ class Session:
     def _start(self, cmd: str, root: bool):
         chan = self.client.get_transport().open_session()
         if root:
-            # sshd refuses root password logins: go through sudo, password on stdin (not
-            # in the command line, where any process listing would show it)
             chan.exec_command(f"sudo -S -p '' sh -c {shlex.quote(cmd)}")
             chan.sendall((self.cfg.tablet_password + "\n").encode())
         else:
@@ -59,7 +54,6 @@ class Session:
         return chan
 
     def run(self, cmd: str, root: bool = False, timeout: float = 600) -> int:
-        """Run cmd, streaming its output; return its exit status."""
         chan = self._start(cmd, root)
         out = sys.stdout.buffer
         err = sys.stderr.buffer
@@ -79,7 +73,6 @@ class Session:
                 time.sleep(0.05)
 
     def capture(self, cmd: str, root: bool = False, timeout: float = 600) -> tuple[int, str]:
-        """Run cmd and return (exit status, stdout + stderr)."""
         chan = self._start(cmd, root)
         chan.settimeout(timeout)
         chan.set_combine_stderr(True)
@@ -98,7 +91,6 @@ class Session:
 
 
 def interactive_shell(cfg: Config | None = None) -> int:
-    """Hand the terminal to the system ssh client (OpenSSH ships with Windows 10+)."""
     cfg = cfg or load()
     return subprocess.call([
         "ssh", "-o", "StrictHostKeyChecking=no", "-o", f"UserKnownHostsFile={os.devnull}",

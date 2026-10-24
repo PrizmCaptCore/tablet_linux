@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Settings from <repo>/config.toml (see config.example.toml); every key has a default."""
 from __future__ import annotations
 
 import functools
@@ -11,24 +10,19 @@ from pathlib import Path, PurePosixPath
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_FILE = REPO / "config.toml"
-# tablet login: ID=<user> and PW=<password> lines (ignored by git); TB_USER/TB_PASS override
 CREDENTIALS_FILE = REPO / ".env"
 
 
 @dataclass(frozen=True)
 class Config:
-    # [build]: Linux-side paths; only meaningful where the build steps run (Linux / WSL)
     work: Path
     out: Path
     backup: Path
     stock_firmware: Path | None
-    # [wsl]
     wsl_distro: str
-    # [tablet]
     tablet_host: str
     tablet_user: str
     fastboot: str
-    # [rootfs]: defaults for `tbctl rootfs build` (hostname, locale, timezone, fonts, ...)
     rootfs: dict
 
     @property
@@ -45,8 +39,6 @@ def _credentials() -> dict[str, str]:
 
 
 def build_user_home() -> Path:
-    """Home of the user the build belongs to. Root runs (loop mounts) are started through
-    sudo or `wsl -u root`, which pass the real home in SUDO_USER / TBCTL_HOME."""
     if os.environ.get("TBCTL_HOME"):
         return Path(os.environ["TBCTL_HOME"])
     if os.environ.get("SUDO_USER"):
@@ -56,8 +48,7 @@ def build_user_home() -> Path:
 
 def _build_path(value: str) -> Path:
     if os.name == "nt":
-        # Linux-side path seen from Windows: keep it as text, it is never opened here
-        return PurePosixPath(value)  # type: ignore[return-value]
+        return PurePosixPath(value)
     if value.startswith("~"):
         return build_user_home() / value[1:].lstrip("/")
     p = Path(value)
@@ -78,11 +69,10 @@ def load() -> Config:
     out = Path(build.get("out", "out"))
     return Config(
         work=_build_path(build.get("work", "~/tb138fc")),
-        out=out if out.is_absolute() else REPO / out,   # the same repo path on both sides
+        out=out if out.is_absolute() else REPO / out,
         backup=_build_path(build.get("backup", "backup")),
         stock_firmware=_build_path(build["stock_firmware"]) if build.get("stock_firmware") else None,
         wsl_distro=wsl.get("distro", ""),
-        # TB_HOST: one-off override, e.g. the tablet's Wi-Fi address
         tablet_host=os.environ.get("TB_HOST") or tablet.get("host", "172.16.42.1"),
         tablet_user=os.environ.get("TB_USER") or _credentials().get("ID")
         or tablet.get("user", "alarm"),

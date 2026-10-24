@@ -1,21 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""TB138FC build steps:
-
-    tbctl dts                          dts/sm8250-lenovo-tb138fc.dts from the J716F tree
-    tbctl panel driver                 panel-raydium-rm692h0.c from template + init sequence
-    tbctl panel init-sequence          rm692h0-init.inc from the stock DT (Linux)
-    tbctl kernel build                 Image.gz, DTB, modules (Linux)
-    tbctl kernel modules               out/modules-<kver>.tar.gz for a running tablet (Linux)
-    tbctl kernel patches               which kernel/patches apply to the tree (Linux)
-    tbctl kernel config SYM...         values of kernel config symbols (Linux)
-    tbctl initramfs                    out/initramfs.cpio.gz (Linux)
-    tbctl bootimg                      out/boot.img from the kernel tree + initramfs (Linux)
-    tbctl firmware extract             stock QFIL package -> <work>/stock-fw (Linux)
-    tbctl firmware stock-dt            stock DTBs -> <work>/stock, decompiled (Linux)
-    tbctl firmware package             out/firmware-tb138fc.tar.gz (Linux)
-    tbctl firmware hexagonfs           out/hexagonfs-tb138fc.tar.gz, SLPI sensor files (Linux)
-    tbctl firmware devmap              out/stock-devmap.txt from the decompiled stock overlay (Linux)
-"""
 from __future__ import annotations
 
 import argparse

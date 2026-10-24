@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The Android boot image (header v2) for boot_a: kernel Image.gz + DTB + initramfs."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,7 +8,6 @@ from tbctl.core.config import load
 from tbctl.core.process import BuildError, log, run
 from tbctl.device.tb138fc import kernel
 
-# Layout of the stock ZUI boot.img. abl appends its own arguments (androidboot.*, init=/init).
 MKBOOTIMG_ARGS = [
     "--header_version", "2", "--os_version", "11.0.0", "--os_patch_level", "2021-10",
     "--pagesize", "4096", "--base", "0x0", "--kernel_offset", "0x8000",

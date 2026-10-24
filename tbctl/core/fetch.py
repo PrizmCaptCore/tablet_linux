@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Cached downloads."""
 from __future__ import annotations
 
 import hashlib
@@ -12,7 +11,6 @@ from tbctl.core.process import BuildError, log
 
 
 def download(url: str, dest: Path, retries: int = 5) -> Path:
-    """Fetch url to dest unless it is already there (written via a .part file)."""
     if dest.exists():
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)

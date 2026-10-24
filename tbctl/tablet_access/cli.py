@@ -1,12 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Tablet commands (run natively on the PC, Windows or Linux):
-
-    tbctl run [--root] CMD...          tbctl push FILE... DIR      tbctl pull REMOTE [LOCAL]
-    tbctl shell                        tbctl reboot [--bootloader] [--no-wait]
-    tbctl flash boot [IMAGE]           tbctl flash rootfs [IMAGE] --wipe-userdata
-    tbctl rescue run CMD...            tbctl rescue push FILE REMOTE
-    tbctl debug regs [-o FILE]         tbctl debug gpu
-"""
 from __future__ import annotations
 
 import argparse
@@ -28,8 +20,6 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def _remote(path: str) -> str:
-    """A tablet path must be absolute POSIX. Git Bash rewrites /tmp, /home/... arguments into
-    Windows paths before tbctl sees them."""
     if not path.startswith("/"):
         raise BuildError(f"tablet path {path!r} is not an absolute Linux path"
                          " (from Git Bash: set MSYS_NO_PATHCONV=1 or write //tmp)")

@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Loop-mounted images and chroots into them."""
 from __future__ import annotations
 
 import contextlib
@@ -15,7 +14,6 @@ KERNEL_FS = ("proc", "sys", "dev", "dev/pts")
 
 @contextlib.contextmanager
 def loop_mounted(image: Path, mountpoint: Path, readonly: bool = False):
-    # noload: a read-only mount must not replay the ext4 journal into the image
     opts = "loop,ro,noload" if readonly else "loop"
     if not image.is_file():
         raise BuildError(f"no such image: {image}")
@@ -28,8 +26,6 @@ def loop_mounted(image: Path, mountpoint: Path, readonly: bool = False):
 
 
 def kill_processes_in(root: Path) -> None:
-    """Kill everything whose root is inside `root` (daemons started in the chroot, e.g.
-    gpg-agent from pacman-key, pin the mounts)."""
     root_s = str(root.resolve())
     for proc in Path("/proc").iterdir():
         if not proc.name.isdigit():
@@ -43,7 +39,6 @@ def kill_processes_in(root: Path) -> None:
 
 @contextlib.contextmanager
 def chroot_ready(root: Path):
-    """Bind the kernel filesystems and the host's resolv.conf into `root`; undo on exit."""
     for d in KERNEL_FS:
         run(["mount", "--bind", f"/{d}", str(root / d)])
     resolv = root / "etc/resolv.conf"
@@ -62,7 +57,5 @@ def chroot_ready(root: Path):
 
 
 def in_chroot(root: Path, script: str, stdin: str | None = None) -> None:
-    """Run a bash script inside `root` (strict mode); `stdin` feeds it data that must not
-    appear in a command line (passwords)."""
     run(["chroot", str(root), "/bin/bash", "-eo", "pipefail", "-c", script], input=stdin,
         text=stdin is not None)

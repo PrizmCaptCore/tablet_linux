@@ -1,13 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The TB138FC layer of the root filesystem image, on top of distro.archlinux:
-
-  rootfs/overlay/         files in their install location (services, udev rules, UCM, ...)
-  rootfs/build/*.sh       run in the image chroot: qbootctl, hexagonrpcd (built from source)
-  out/firmware-*.tar.gz   stock remoteproc/zap/amp firmware   (tbctl firmware package)
-  out/hexagonfs-*.tar.gz  stock SLPI sensor files             (tbctl firmware hexagonfs)
-  kernel modules          from the kernel tree                (tbctl kernel build)
-  /usr/local/bin/regdump  initramfs/src/regdump.c, for `tbctl debug regs`
-"""
 from __future__ import annotations
 
 import os
@@ -26,44 +17,39 @@ OVERLAY = DATA / "rootfs" / "overlay"
 BUILD_SCRIPTS = (DATA / "rootfs/build/qbootctl.sh", DATA / "rootfs/build/hexagonrpcd.sh")
 HEXAGONRPCD_PATCHES = DATA / "rootfs/build/hexagonrpcd-patches"
 EXECUTABLE_DIRS = ("usr/local/bin",)
-# links git cannot be trusted with (Windows checkouts turn symlinks into text files)
 SYMLINKS = {
     "usr/share/alsa/ucm2/conf.d/sm8250/Lenovo-TB138FC.conf": "../../Lenovo/TB138FC/TB138FC.conf",
-    # no hibernation (no swap partition); suspend is the panel-off stand-in tb138fc-fake-suspend
     **{f"etc/systemd/system/{t}.target": "/dev/null" for t in ("hibernate", "hybrid-sleep")},
 }
-STATIC_HELPERS = ("regdump",)           # initramfs/src/<name>.c -> /usr/local/bin/<name>
+STATIC_HELPERS = ("regdump",)
 
 PACKAGES = ("iio-sensor-proxy", "linux-firmware-qcom", "i2c-tools",
-            "vulkan-freedreno",   # Turnip: Vulkan on the Adreno 650 (mesa has GL only)
-            "zram-generator")     # zram swap, configured in overlay/etc/systemd
+            "vulkan-freedreno",
+            "zram-generator")
 SERVICES = (
-    "tb138fc-rtc.service",            # sysinit: system clock from RTC + saved offset
+    "tb138fc-rtc.service",
     "tb138fc-rtc-save.path",
-    "tb138fc-macs.service",           # Wi-Fi address from fpinfo
-    "tb138fc-spk-cal.service",        # speaker calibration from persist
-    "tb138fc-bt-watchdog.service",    # QCA6390 BT crash-loop recovery
-    "tb138fc-usb-gadget.service",     # USB NCM debug link
-    "tb138fc-boot-success.service",   # mark slot a successful (abl)
-    "hexagonrpcd-sdsp.service",       # SLPI sensors
-    "tb138fc-power-key.service",      # power key: screen toggle / power-off dialog
+    "tb138fc-macs.service",
+    "tb138fc-spk-cal.service",
+    "tb138fc-bt-watchdog.service",
+    "tb138fc-usb-gadget.service",
+    "tb138fc-boot-success.service",
+    "hexagonrpcd-sdsp.service",
+    "tb138fc-power-key.service",
 )
 DEFAULTS = {"hostname": "tb138fc", "label": "tb138fc-root"}
 
 
 def gamemode(image: ImageConfig) -> ImageConfig:
-    """`image` (with this layer) plus game mode, see tbctl.device.tb138fc.gamemode."""
-    from tbctl.device.tb138fc import gamemode as gm   # imported on demand: Steam, FEX, makepkg
+    from tbctl.device.tb138fc import gamemode as gm
     return gm.layer(image)
 
 
 def _stage_layer(tree: Path) -> Path:
-    """The overlay as it lands in the image: normalized modes, symlinks, helpers, patches."""
     cfg = load()
     stage = cfg.work / "device-layer"
     shutil.rmtree(stage, ignore_errors=True)
     shutil.copytree(OVERLAY, stage, symlinks=True)
-    # the checkout's modes are meaningless (Windows/drvfs): set them explicitly
     for path in stage.rglob("*"):
         if path.is_symlink():
             continue
@@ -78,7 +64,7 @@ def _stage_layer(tree: Path) -> Path:
         run(["aarch64-linux-gnu-gcc", "-static", "-O2", "-o", str(stage / "usr/local/bin" / name),
              str(DATA / "initramfs/src" / f"{name}.c")])
     shutil.copytree(HEXAGONRPCD_PATCHES, stage / "tmp/hexagonrpcd-patches")
-    (stage / "tmp").chmod(0o1777)   # copied over the image's /tmp: keep it world-writable
+    (stage / "tmp").chmod(0o1777)
     return stage
 
 
@@ -92,7 +78,6 @@ def _finish_script(kver: str) -> Path:
 
 
 def layer(image: ImageConfig, tree: Path | None = None) -> ImageConfig:
-    """`image` with the TB138FC layer added (prerequisites are checked here)."""
     tree = tree or kernel.tree_path()
     out = load().out
     tars = [out / "firmware-tb138fc.tar.gz", out / "hexagonfs-tb138fc.tar.gz"]

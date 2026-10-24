@@ -1,6 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The rescue initramfs (no root filesystem found): busybox telnetd on port 23, files over
-busybox nc on port 5555. No authentication; reachable only over the USB link."""
 from __future__ import annotations
 
 import socket
@@ -15,7 +13,6 @@ MARK = "__TBCTL_DONE__"
 
 
 def _strip_negotiation(sock: socket.socket, data: bytes) -> bytes:
-    """Refuse every telnet option the server offers and drop the negotiation bytes."""
     out = bytearray()
     i = 0
     while i < len(data):
@@ -33,7 +30,6 @@ def _strip_negotiation(sock: socket.socket, data: bytes) -> bytes:
 
 
 def run(cmd: str, timeout: float = 60) -> str:
-    """Run cmd in the rescue shell and return its output."""
     host = load().tablet_host
     try:
         s = socket.create_connection((host, 23), timeout=10)
@@ -43,7 +39,7 @@ def run(cmd: str, timeout: float = 60) -> str:
         s.settimeout(1)
         time.sleep(0.5)
         try:
-            _strip_negotiation(s, s.recv(65536))   # banner and prompt
+            _strip_negotiation(s, s.recv(65536))
         except socket.timeout:
             pass
         s.sendall(f"stty -echo 2>/dev/null; {cmd}; echo {MARK}\n".encode())
@@ -57,7 +53,6 @@ def run(cmd: str, timeout: float = 60) -> str:
             if not chunk:
                 break
             buf += _strip_negotiation(s, chunk)
-            # the marker also appears in the echoed command line; wait for the printed one
             if MARK.encode() in buf.split(b"echo " + MARK.encode())[-1]:
                 break
     text = buf.decode("utf-8", "replace").replace("\r", "")
@@ -67,7 +62,6 @@ def run(cmd: str, timeout: float = 60) -> str:
 
 
 def push(local: Path, remote: str, mode: str = "755") -> str:
-    """Copy a file: a backgrounded nc receives it (stdin detached from the telnet pty)."""
     host = load().tablet_host
     data = local.read_bytes()
     run("rm -f /tmp/.rx; (nc -l -p 5555 > /tmp/.rx) </dev/null >/dev/null 2>&1 &")

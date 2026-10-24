@@ -1,10 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The TB138FC devicetree, derived from the J716F one by a list of edits (findings from the
-decompiled stock DT, `tbctl firmware stock-dt`). Output: dts/sm8250-lenovo-tb138fc.dts.
-
-The edits are exact-text replacements on the J716F source, so they fail loudly (assert)
-when the reference changes instead of silently producing a wrong tree.
-"""
 from __future__ import annotations
 
 import difflib
@@ -18,7 +12,6 @@ OUTPUT = DTS_DIR / "sm8250-lenovo-tb138fc.dts"
 
 
 def derive(src: str) -> str:
-    """Apply the TB138FC edits to the J716F devicetree source."""
     s = src
 
     def sub(old: str, new: str) -> None:
@@ -37,7 +30,6 @@ def derive(src: str) -> str:
     sub('qcom,board-id = <0x2010008 0>;', 'qcom,board-id = <0x10008 0>, <0x2010008 0>, <0x3010008 0>;')
     sub('height = <1600>;', 'height = <1536>;')
 
-    # Keyboard pack: stock DT has keyboard@60 on i2c1 (irqs gpio54/gpio129) and touchpad@61 on i2c3 (irq gpio11).
     sub("""	touchpad@60 {
 		compatible = "hid-over-i2c";
 		reg = <0x60>;""", """	/* Stock: keyboard@60, irqs on gpio54/gpio129; not yet verified */
@@ -116,13 +108,11 @@ def derive(src: str) -> str:
 	};
 """)
 
-    # Remoteprocs and GPU zap shader: stock firmware squashed by `tbctl firmware package`.
     for n in ['adsp', 'cdsp', 'slpi', 'venus']:
         sub(f'firmware-name = "qcom/sm8250/LENOVO/J716F/{n}.mbn";',
             f'firmware-name = "qcom/sm8250/LENOVO/TB138FC/{n}.mbn";')
     sub('"qcom/sm8250/LENOVO/J716F/a650_zap.mbn"', '"qcom/sm8250/LENOVO/TB138FC/a650_zap.mbn"')
 
-    # Lets Linux "reboot bootloader" land in fastboot (same as other SM8250 boards).
     sub("&pon_pwrkey {", """&pon {
 	mode-bootloader = <0x2>;
 	mode-recovery = <0x1>;
@@ -130,21 +120,13 @@ def derive(src: str) -> str:
 
 &pon_pwrkey {""")
 
-    # No PM8009 on this board: SPMI SIDs 0xa/0xb NACK and RPMh has no "smpf1" resource.
     sub('#include "pm8009.dtsi"\n', '')
     s = re.sub(r'\n\tregulators-2 \{\n\t\tcompatible = "qcom,pm8009-rpmh-regulators";.*?\n\t\};\n', '\n', s, flags=re.S)
     assert 'pm8009' not in s and 'vreg_s1f' not in s
-    # Wi-Fi/BT PMU: J716F feeds vddpmu from PM8009 s2f, which this board lacks; lenovo-q706f
-    # (same SoC/PMIC set) feeds vddaon/vddpmu/vddrfa0p95 all from PM8150 s6a.
     sub("\t\tvddpmu-supply = <&vreg_s2f_0p5>;\n", "\t\tvddpmu-supply = <&vreg_s6a_0p6>;\n")
 
-    # MDSS: msm display + GPU. Being an interconnect consumer it also keeps display bandwidth
-    # voted between boot and msm probe (otherwise sync_state freezes the splash panel).
     sub("&pcie0 {", "&mdss {\n\tstatus = \"okay\";\n};\n\n&pcie0 {")
 
-    # Touchscreen: Goodix GT9966S (Berlin) on SPI0. Stock: avdd enable gpio108, reset gpio38,
-    # irq gpio39 falling, 2560x1536, 1 MHz. Upstream has no gt9966 entry; GT9966 is Berlin-B,
-    # which uses the Berlin-D (gt9916) SPI framing.
     sub("""	qca6390-pmu {""", """	ts_avdd: regulator-ts-avdd {
 		compatible = "regulator-fixed";
 		regulator-name = "ts_avdd";
@@ -219,10 +201,6 @@ def derive(src: str) -> str:
 
 	wlan_en: wlan-en-state {""")
 
-    # Display: RM692H0 dual-DSI command-mode DSC panel (kernel/panel/panel-raydium-rm692h0.c).
-    # Wiring matches the J716F/RM69380 binding example (avdd gpio61, vddio l14a, reset gpio75) plus
-    # the stock vdd (l11c); TE on gpio66 (mdp_vsync). Bonded DSI as on the J716F
-    # (ungeskriptet/linux sm8250-next): qcom,sync-dual-dsi + kernel/patches/0001.
     sub("""	qca6390-pmu {""", """	panel_avdd: regulator-panel-avdd {
 		compatible = "regulator-fixed";
 		regulator-name = "panel_avdd";
@@ -337,10 +315,6 @@ def derive(src: str) -> str:
 	};
 
 	wlan_en: wlan-en-state {""")
-    # Speakers: 4x CS35L43 on i2c4 (stock: shared reset gpio131, shared irq gpio68, VA s4a,
-    # DSP firmware spkN-cs35l43-dsp1-spk-prot.*). Stock Android drives them over primary TDM;
-    # the same mi2s0 pins run plain I2S here (as on the CS35L43-based Xiaomi Pad 6S Pro), with
-    # playback on data1 (gpio140, stock "pri_tdm_dout").
     sub("""	/* CS35L43 audio amp @ 40 */
 	/* CS35L43 audio amp @ 41 */
 	/* CS35L43 audio amp @ 42 */
@@ -364,9 +338,6 @@ def derive(src: str) -> str:
 		cirrus,vpbr-thld = <21>;
 	}};
 """ for addr, n in ((0x40, 4), (0x41, 1), (0x42, 2), (0x43, 3))))
-    # The amps' interrupt outputs are open drain on one shared line: without the stock pull-up the
-    # TLMM default pull-down keeps the level-low irq asserted (~200 irq/s, load average ~100).
-    # Only the first amp to probe (@40) applies the pin state.
     sub("""		cirrus,dsp-part-name = "spk4-cs35l43";
 """, """		cirrus,dsp-part-name = "spk4-cs35l43";
 		pinctrl-0 = <&spk_amp_irq>;
@@ -495,13 +466,6 @@ def derive(src: str) -> str:
 };
 
 &pcie0 {""")
-    # Charging: PM8150B SMB5 main charger (qcom_smbx + kernel/patches SMB5 series). The stock
-    # fast-charge path adds 2x SMB1396 charge pumps + SMB1398 (no mainline driver), so only the
-    # main charger runs: 5 V input, ICL up to the stock 3 A. Battery values from the stock
-    # battery-data: 4.485 V float - its node is named after Qualcomm's reference cell (4.40 V), but the
-    # values are Lenovo's (4.485 V, 16 A, JEITA 4.23 V). The cell spec (L22D2P31) is unconfirmed, so
-    # float is kept at 4.45 V. Charge current is capped at the stock cold-range 2.4 A because nothing
-    # implements the stock JEITA/step charging yet.
     sub('#include "pm8150l.dtsi"\n', '#include "pm8150b.dtsi"\n#include "pm8150l.dtsi"\n')
     sub("""	vph_pwr: regulator-vph-pwr {""", """	/* stock wcd938x-codec: reset gpio32 (msm_cdc_pinctrl@32), 1.8 V supplies, micbias 1-3
 	 * 2.4 V and 4 1.8 V (no headset jack on this tablet; the codec only serves the mics) */
@@ -546,11 +510,6 @@ def derive(src: str) -> str:
 		reg = <0x55>;
 		monitored-battery = <&battery>;
 	};""")
-    # USB-C: PM8150B Type-C + PD PHY (TCPM), wired like the SM8250 RB5 (same NB7VPQ904M
-    # redriver). Dual role, preferring sink; dwc3 starts as peripheral so the USB NCM debug link
-    # comes up before TCPM (a module) decides. Only 5 V is requested as a sink: the SMB5 series
-    # does not program USBIN_ADAPTER_ALLOW for higher PD voltages yet. OTG VBUS is capped below
-    # the stock otg-cl-ua (1.8 A).
     sub('#include "pm8150b.dtsi"\n', '#include <dt-bindings/usb/pd.h>\n#include "pm8150b.dtsi"\n')
     sub("&pcie0 {", """&pm8150b_vbus {
 	regulator-min-microamp = <500000>;
@@ -651,7 +610,6 @@ def derive(src: str) -> str:
 	usb-role-switch;
 	role-switch-default-mode = "peripheral";
 };""")
-    # stock: onnn,redriver @0x19 on se13, vdd pm8150_l16 (3.0-3.3 V, same range as here)
     sub("	/* onsemi USB redriver @ 19 */\n", """	typec-mux@19 {
 		compatible = "onnn,nb7vpq904m";
 		reg = <0x19>;
@@ -731,7 +689,6 @@ def derive(src: str) -> str:
 
 
 def generate(output=OUTPUT) -> int:
-    """Write the TB138FC devicetree; return the number of diff lines against the J716F one."""
     src = REFERENCE.read_text(encoding="utf-8")
     s = derive(src)
     output.write_text(s, encoding="utf-8", newline="\n")

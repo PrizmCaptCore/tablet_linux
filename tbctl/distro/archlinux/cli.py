@@ -1,14 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""`tbctl rootfs build|inspect`.
-
-    tbctl rootfs build --device tb138fc        the tablet image: <work>/rootfs.img + out/rootfs.simg
-    tbctl rootfs build --device tb138fc --gamemode   ... booting into Steam (game mode)
-    tbctl rootfs build -o plain.img            plain Arch Linux ARM + GNOME (any aarch64 board)
-    tbctl rootfs inspect IMAGE
-
-Hostname, locale, timezone and fonts default to config.toml [rootfs], then to the device,
-then to plain Arch defaults; options override all of them.
-"""
 from __future__ import annotations
 
 import argparse
@@ -22,19 +12,17 @@ from tbctl.distro.archlinux.build import build
 from tbctl.distro.archlinux.config import ImageConfig
 from tbctl.distro.archlinux.inspect import inspect
 
-# device name -> module with DEFAULTS and layer(ImageConfig) -> ImageConfig
 DEVICES = {"tb138fc": "tbctl.device.tb138fc.rootfs"}
 
 
 def _build(args: argparse.Namespace) -> None:
     host.ensure(host.require_linux_root())
-    host.enter_private_mount_namespace()   # before the device layer: build() would re-exec
+    host.enter_private_mount_namespace()
     cfg = load()
     device = importlib.import_module(DEVICES[args.device]) if args.device else None
     plain = ImageConfig(output=Path())
 
     def setting(name: str):
-        """option > config.toml [rootfs] > device default > ImageConfig default"""
         value = getattr(args, name)
         if value not in (None, []):
             return value
@@ -58,7 +46,6 @@ def _build(args: argparse.Namespace) -> None:
         overlay_tars=[p.resolve() for p in args.overlay_tars],
         chroot_scripts=[p.resolve() for p in args.chroot_scripts])
     if device:
-        # the login from .env (ID/PW) replaces alarm/alarm
         if cfg.tablet_user != "alarm":
             image.account = (cfg.tablet_user, cfg.tablet_password)
         image = device.layer(image)

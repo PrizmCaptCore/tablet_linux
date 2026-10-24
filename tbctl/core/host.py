@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Checks on the build host, collected up front so a build fails before doing any work."""
 from __future__ import annotations
 
 import os
@@ -27,8 +26,6 @@ def require_tools(tools: list[str]) -> list[str]:
 
 
 def require_aarch64_exec() -> list[str]:
-    """aarch64 binaries must run here: natively, or through qemu-user binfmt with the F
-    (fix-binary) flag, so the interpreter need not exist inside a chroot."""
     if platform.machine() in ("aarch64", "arm64"):
         return []
     binfmt = Path("/proc/sys/fs/binfmt_misc/qemu-aarch64")
@@ -48,8 +45,6 @@ def ensure(problems: list[str]) -> None:
 
 
 def give_back(*paths: Path) -> None:
-    """Root runs (image builds) create work files: hand them to the user who owns the build
-    home, so later runs as that user can replace them."""
     if os.geteuid() != 0:
         return
     st = build_user_home().stat()
@@ -61,8 +56,6 @@ def give_back(*paths: Path) -> None:
 
 
 def enter_private_mount_namespace() -> None:
-    """Re-exec this command in a private mount namespace. Under WSL, systemd services copy
-    our loop/bind mounts into their own namespaces and keep the image busy after unmount."""
     if os.environ.get("TBCTL_UNSHARED"):
         return
     env = dict(os.environ, TBCTL_UNSHARED="1")

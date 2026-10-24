@@ -139,3 +139,11 @@ GPL-2.0-only (see [LICENSE](LICENSE)), like the kernel code it carries. Patches 
 projects (`data/kernel/patches/`, `data/rootfs/build/hexagonrpcd-patches/`) follow the license of the
 project they patch. Firmware extracted from the stock image is Lenovo/Qualcomm property and
 is never part of this repository.
+
+Sources:
+- `data/kernel/cs35l43/`: CS35L43 amp driver from the Xiaomi Pad 6S Pro mainline port
+  ([ianchb/sm8550-mainline](https://github.com/ianchb/sm8550-mainline), branch sheng-7.2.10),
+  plus speaker calibration.
+- `data/rootfs/build/hexagonrpcd-patches/`: registry write support from the Galaxy Tab S8+ port
+  ([aaronsb/sm-x800-linux](https://github.com/aaronsb/sm-x800-linux), PR #37), for hexagonrpc
+  commit 598b591.

@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""`tbctl doctor`: report what the build host is missing, per build step."""
 from __future__ import annotations
 
 import argparse
@@ -10,7 +9,6 @@ from tbctl.core.config import CONFIG_FILE, load
 from tbctl.device.tb138fc import bootimg, firmware, initramfs, kernel, panel
 from tbctl.distro.archlinux.build import REQUIRED_TOOLS as ROOTFS_TOOLS
 
-# build step -> host tools it runs; each step module owns its list
 STEPS = {
     "kernel": kernel.REQUIRED_TOOLS,
     "initramfs": initramfs.REQUIRED_TOOLS,

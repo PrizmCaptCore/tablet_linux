@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Debug helpers: run a packaged tablet-side script as root and collect its result."""
 from __future__ import annotations
 
 from importlib import resources
@@ -19,7 +18,6 @@ def run_script(session: Session, name: str, *args: str) -> int:
 
 
 def display_registers(output: Path) -> int:
-    """Dump the display-path registers (DPU, DSI, DSI PHY/PLL) into a local file."""
     remote = "/tmp/disp-regs.txt"
     with Session() as s:
         rc = run_script(s, "disp-regdump.sh", remote)
@@ -30,6 +28,5 @@ def display_registers(output: Path) -> int:
 
 
 def gpu_status() -> int:
-    """Is GNOME rendering on the Adreno GPU?"""
     with Session() as s:
         return run_script(s, "gpu-check.sh")

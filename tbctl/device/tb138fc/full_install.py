@@ -1,13 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""`tbctl tb138fc full_install`: every build step in order, then flash the tablet.
-
-    stock firmware -> firmware tarballs -> kernel -> initramfs -> boot.img
-    -> rootfs (Arch + GNOME + TB138FC layer + game mode) -> flash boot and rootfs
-
-Runs on the PC (Windows or Linux); the build steps go through the normal commands, so on
-Windows each one runs inside WSL. Flashing replaces userdata, so it only happens with
---wipe-userdata; without it the images are left in out/. --from resumes at a step.
-"""
 from __future__ import annotations
 
 import argparse
@@ -16,7 +7,6 @@ from tbctl.core.config import load
 from tbctl.core.process import BuildError, log
 from tbctl.tablet_access import fastboot
 
-# step name -> tbctl arguments
 STEPS = {
     "doctor": ["doctor"],
     "firmware-extract": ["firmware", "extract"],
@@ -30,7 +20,7 @@ STEPS = {
 
 
 def _run_step(argv: list[str]) -> None:
-    from tbctl.cli import main            # the CLI imports this module
+    from tbctl.cli import main
     if main(argv) != 0:
         raise BuildError(f"step failed: tbctl {' '.join(argv)}")
 

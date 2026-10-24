@@ -1,7 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The TB138FC kernel: upstream stable tarball + kernel/patches + out-of-tree drivers +
-kernel/tb138fc.config, built for arm64 (Image.gz, DTB, modules). Runs on Linux, not as root.
-"""
 from __future__ import annotations
 
 import os
@@ -24,14 +21,11 @@ KERNEL_SUMS_URL = f"https://cdn.kernel.org/pub/linux/kernel/v{_MAJOR}.x/sha256su
 DTS_NAME = "sm8250-lenovo-tb138fc"
 PATCH_DIR = DATA / "kernel" / "patches"
 CONFIG_FRAGMENT = DATA / "kernel" / "tb138fc.config"
-# patches already applied to a tree, one file name per line (a reverse dry-run cannot tell
-# for series whose patches touch the same lines)
 APPLIED_RECORD = ".tb138fc-patches"
 
 MAKE_ENV = {"ARCH": "arm64", "CROSS_COMPILE": "aarch64-linux-gnu-"}
 REQUIRED_TOOLS = ("make", "gcc", "aarch64-linux-gnu-gcc", "aarch64-linux-gnu-strip", "bc",
                   "bison", "flex", "patch", "tar", "xz")
-# dtc warnings about the stock-derived nodes are noise in every build
 NOISE = re.compile(r"Warning \(|^\s*$")
 
 
@@ -48,10 +42,7 @@ def kernelrelease(tree: Path) -> str:
     return _make(tree, "kernelrelease", capture_output=True, text=True).stdout.strip()
 
 
-# ---------------------------------------------------------------------------- source tree
-
 def fetch_tree(tree: Path) -> None:
-    """Unpack the upstream tarball into `tree` (checked against kernel.org's sha256sums)."""
     if tree.exists():
         return
     dl = load().work / "dl"
@@ -60,7 +51,7 @@ def fetch_tree(tree: Path) -> None:
     expected = next((l.split()[0] for l in sums.read_text().splitlines()
                      if l.endswith(f" linux-{KERNEL_VERSION}.tar.xz")), None)
     if expected is None:
-        sums.unlink()   # an older copy of the list: fetch it again next time
+        sums.unlink()
         raise BuildError(f"linux-{KERNEL_VERSION}.tar.xz not in sha256sums.asc (run again)")
     if file_digest(tarball, "sha256") != expected:
         tarball.unlink()
@@ -71,7 +62,6 @@ def fetch_tree(tree: Path) -> None:
 
 
 def apply_patches(tree: Path) -> list[str]:
-    """Apply kernel/patches/*.patch in order, each once; return the newly applied ones."""
     record = tree / APPLIED_RECORD
     applied = set(record.read_text().split()) if record.exists() else set()
     new = []
@@ -90,7 +80,6 @@ def apply_patches(tree: Path) -> list[str]:
 
 
 def patch_status(tree: Path) -> list[tuple[str, str]]:
-    """Per patch: recorded / applies / already-in (reverse applies) / conflicts."""
     record = tree / APPLIED_RECORD
     applied = set(record.read_text().split()) if record.exists() else set()
     status = []
@@ -105,8 +94,6 @@ def patch_status(tree: Path) -> list[tuple[str, str]]:
 
 
 def _insert_once(path: Path, marker: str, text: str, before: str | None = None) -> None:
-    """Add `text` to a Kconfig/Makefile unless `marker` is already there (before the line
-    `before`, else at the end)."""
     s = path.read_text()
     if marker in s:
         return
@@ -120,12 +107,11 @@ def _insert_once(path: Path, marker: str, text: str, before: str | None = None) 
 
 
 def install_out_of_tree(tree: Path) -> None:
-    """Devicetree, RM692H0 panel driver and CS35L43 amp driver into the kernel tree."""
     qcom = tree / "arch/arm64/boot/dts/qcom"
     shutil.copy(DATA / "dts" / f"{DTS_NAME}.dts", qcom)
     _insert_once(qcom / "Makefile", f"{DTS_NAME}.dtb",
                  f"dtb-$(CONFIG_ARCH_QCOM)\t+= {DTS_NAME}.dtb\n",
-                 before=None)   # placement within the list does not matter for the build
+                 before=None)
 
     panel = tree / "drivers/gpu/drm/panel"
     shutil.copy(DATA / "kernel/panel/panel-raydium-rm692h0.c", panel)
@@ -155,10 +141,7 @@ def install_out_of_tree(tree: Path) -> None:
                  "obj-$(CONFIG_SND_SOC_CS35L43_I2C)\t+= snd-soc-cs35l43-i2c.o\n")
 
 
-# ---------------------------------------------------------------------------- configuration
-
 def _parse_config(text: str) -> dict[str, str]:
-    """CONFIG_X=v lines and '# CONFIG_X is not set' (as 'n')."""
     values = {}
     for line in text.splitlines():
         if m := re.match(r"(CONFIG_\w+)=(.*)$", line):
@@ -189,8 +172,6 @@ def config_values(tree: Path, symbols: list[str]) -> list[str]:
             f"{final.get('CONFIG_' + s.removeprefix('CONFIG_'), '(absent)')}" for s in symbols]
 
 
-# ---------------------------------------------------------------------------- build
-
 def build(tree: Path | None = None) -> Path:
     tree = tree or tree_path()
     host.ensure(host.require_tools(list(REQUIRED_TOOLS)))
@@ -212,8 +193,6 @@ def dtb_path(tree: Path) -> Path:
 
 
 def modules_tarball(tree: Path | None = None) -> Path:
-    """Stripped modules as $OUT/modules-<kver>.tar.gz (usr/lib/modules/<kver>), for pushing
-    to a running tablet (`tbctl push` + `tar -C / -xzf`) instead of reflashing the rootfs."""
     tree = tree or tree_path()
     cfg = load()
     kver = kernelrelease(tree)

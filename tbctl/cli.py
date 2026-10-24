@@ -1,11 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Command line entry point: `tbctl <group> <command> ...`.
-
-Each command group lives in its own module and registers its subcommands through a
-`register(subparsers)` function. Every subcommand sets `func` (its handler, returning an
-exit status or None) and may set `runs_on="linux"` (build steps; re-run inside WSL when started on Windows) and `root=True`
-(needs root, e.g. loop mounts).
-"""
 from __future__ import annotations
 
 import argparse
@@ -25,7 +18,7 @@ GROUPS = (doctor, archlinux_cli, tb138fc_cli, tablet_access_cli, full_install)
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    ap = argparse.ArgumentParser(prog="tbctl", description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(prog="tbctl", description="TB138FC build and maintenance tool")
     sub = ap.add_subparsers(dest="group", required=True)
     for group in GROUPS:
         group.register(sub)

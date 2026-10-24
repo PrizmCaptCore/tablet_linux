@@ -1,7 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Device map of the stock board overlay (out/stock-devmap.txt): per device node its bus,
-compatible, status, reg/interrupts, GPIOs and supplies, with references resolved through the
-overlay's __fixups__ and local phandles, and PMIC regulators named as in mainline."""
 from __future__ import annotations
 
 import re
@@ -11,13 +8,10 @@ from pathlib import Path
 from tbctl.core.config import load
 from tbctl.core.process import BuildError
 
-# decompiled by `tbctl firmware stock-dt`: dtbo entry ovl04 is this board (kona MTP, 0x10008)
 OVERLAY = "stock/dtbos/ovl04.dts"
 
-# stock regulator label -> mainline name (sm8250 boards: PM8150 = "a", PM8150L = "c")
 MAINLINE_REGULATORS = {"pm8150_l": "vreg_l{n}a", "pm8150a_l": "vreg_l{n}c", "pm8150l_l": "vreg_l{n}c",
                        "pm8150_s": "vreg_s{n}a", "pm8150a_s": "vreg_s{n}c"}
-# nodes worth listing: addressed devices and the board's named peripherals
 INTERESTING = re.compile(r"@|goodix|bq|cs35|ctn|redriver|keyboard|ptp")
 
 
@@ -27,11 +21,9 @@ def _mainline(label: str | None) -> str | None:
 
 
 def device_map(overlay: str) -> list[tuple[str, ...]]:
-    # "/fragment@N/__overlay__/node:prop:idx" -> label of the referenced base-DT node
     fixups = re.search(r"__fixups__ \{(.*?)\n\t\};", overlay, re.S)[1]
     ref = {r: label for label, refs in re.findall(r"\n\t\t(\S+) = (.*?);", fixups)
            for r in re.findall(r'"([^"]+)"', refs)}
-    # phandles defined inside the overlay -> node names
     local = {}
     for m in re.finditer(r"\n(\t+)([\w,@\-.]+) \{\n((?:\1\t.*\n)*?)\1\t*phandle = <(0x[0-9a-f]+)>;", overlay):
         local[int(m[4], 16)] = m[2]

@@ -1,17 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Game mode: SteamOS-style Steam on gamescope, on top of the TB138FC image.
-
-  data/rootfs/gamemode/   session (gamescope-session, steam-launcher), session switching
-                          (steamos-session-select), SDDM autologin, logind power key
-  local packages          gtk2 (AUR; the ARM64 client's UI needs it) and gamescope (Arch's
-                          package + data/rootfs/build/gamescope-patches), built with makepkg in
-                          the image and cached in <work>/pkgcache
-  FEX                     FEX-2610 built in the image (cached) + the Ubuntu x86-64 RootFS
-  Steam                   Valve's ARM64 client in ~/.local/share/Steam-arm64 (Proton ARM64
-                          comes through Steam itself)
-
-Boots straight into game mode; "Switch to Desktop" goes to GNOME and back.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -36,7 +23,6 @@ EXECUTABLE_DIRS = ("usr/local/bin", "usr/local/lib/steamos")
 PACKAGES = ("sddm", "lsof", "squashfuse", "erofs-utils", "fuse3")
 BUILD_USER = "tbctl-build"
 
-# makepkg recipes built inside the image: name -> (git repository, ref, patches)
 GAMESCOPE_PATCHES = DATA / "rootfs" / "build" / "gamescope-patches"
 LOCAL_PACKAGES = {
     "gtk2": ("https://aur.archlinux.org/gtk2.git", "master", ()),
@@ -50,10 +36,9 @@ FEX_BUILD_DEPS = ("cmake", "ninja", "clang", "llvm", "lld", "python", "python-se
 FEX_ROOTFS_URL = "https://rootfs.fex-emu.gg/Ubuntu_24_04/2026-08-11/Ubuntu_24_04.sqsh"
 
 STEAM_CDN = "https://client-update.steamstatic.com/"
-STEAM_MANIFEST = "steam_client_steamdeck_publicbeta_linuxarm64"   # what DroidDeck uses
+STEAM_MANIFEST = "steam_client_steamdeck_publicbeta_linuxarm64"
 STEAM_DIR = ".local/share/Steam-arm64"
 RUN_STEAM = """#!/bin/sh
-# ARM64 Steam client: restart it when it asks to (exit 42 after a self-update).
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
 while :; do
 	./steamrtarm64/steam "$@"
@@ -64,7 +49,6 @@ done
 
 
 def _stage(user: str) -> Path:
-    """The overlay with modes set and the autologin account filled in."""
     stage = load().work / "gamemode-layer"
     shutil.rmtree(stage, ignore_errors=True)
     shutil.copytree(OVERLAY, stage, symlinks=True)
@@ -75,13 +59,10 @@ def _stage(user: str) -> Path:
     stage.chmod(0o755)
     conf = stage / "etc/sddm.conf.d/10-tb138fc-autologin.conf"
     conf.write_text(conf.read_text().replace("@USER@", user))
-    # first boot goes to game mode; steam-set-session rewrites this on every switch
     (stage / "etc/sddm.conf.d/zz-steamos-autologin.conf").write_text(
         "[Autologin]\nSession=gamescope-session.desktop\n")
     return stage
 
-
-# ---------------------------------------------------------------------------- local packages
 
 def _prepare_gamescope(pkgbuild: Path, patches: tuple[Path, ...]) -> None:
     s = pkgbuild.read_text()
@@ -102,7 +83,6 @@ PREPARE = {"gtk2": lambda pkgbuild, patches: None, "gamescope": _prepare_gamesco
 
 
 def _local_packages(root: Path) -> None:
-    """Install gtk2 and the patched gamescope: from <work>/pkgcache, else built here."""
     cache = load().work / "pkgcache"
     cache.mkdir(parents=True, exist_ok=True)
     incoming = root / "tmp/localpkgs"
@@ -115,7 +95,6 @@ def _local_packages(root: Path) -> None:
         shutil.copy(cached[-1], incoming)
     in_chroot(root, "pacman -U --noconfirm --needed /tmp/localpkgs/*.pkg.tar.*\n"
                     "rm -rf /tmp/localpkgs\n"
-                    # keep pacman -Syu from replacing the patched gamescope
                     "sed -i 's/^#\\?IgnorePkg *=.*/IgnorePkg   = gamescope/' /etc/pacman.conf")
     give_back(cache)
 
@@ -136,13 +115,10 @@ runuser -u {BUILD_USER} -- git clone -q --depth 1 --branch {ref} {repo} {work}
     in_chroot(root, f"""
 cd {work}
 chown -R {BUILD_USER}: .
-# dependencies as root (sudo, hence makepkg -s, does not work under qemu-user); pacman
-# resolves soname provides such as libcap.so
 pacman -Qq | sort > /tmp/pkgbuild/before
 deps=$(bash -c 'source PKGBUILD; echo "${{depends[@]}} ${{makedepends[@]}}"')
 pacman -S --noconfirm --needed $deps
 runuser -u {BUILD_USER} -- env MAKEFLAGS=-j$(nproc) makepkg --ignorearch --nocheck --skipinteg --skippgpcheck --noconfirm
-# drop the build-only packages again
 make_only=$(bash -c 'source PKGBUILD; echo "${{makedepends[@]}}"')
 for p in $make_only; do grep -qx "$p" /tmp/pkgbuild/before || pacman -Rns --noconfirm "$p" || true; done
 """)
@@ -153,8 +129,6 @@ for p in $make_only; do grep -qx "$p" /tmp/pkgbuild/before || pacman -Rns --noco
     in_chroot(root, f"rm -rf {work}")
     return cache / built[-1].name
 
-
-# ---------------------------------------------------------------------------- FEX
 
 def _fex(user: str):
     def hook(root: Path) -> None:
@@ -180,7 +154,6 @@ rm -rf /tmp/fex /tmp/fexroot /tmp/fex-before
             shutil.move(root / "tmp/fex.tar.gz", cache)
             give_back(cache)
         run(["bsdtar", "-xpf", str(cache), "-C", str(root)])
-        # x86-64 RootFS and the config that selects it
         sqsh = download(FEX_ROOTFS_URL, cfg.work / "dl" / Path(FEX_ROOTFS_URL).name)
         home = root / "home" / user
         rootfs_dir = home / ".local/share/fex-emu/RootFS"
@@ -193,14 +166,12 @@ rm -rf /tmp/fex /tmp/fexroot /tmp/fex-before
     return hook
 
 
-# ---------------------------------------------------------------------------- Steam
-
 def _steam(user: str):
     def hook(root: Path) -> None:
         cfg = load()
         dl = cfg.work / "dl" / "steam-arm64"
         manifest = (dl / STEAM_MANIFEST)
-        manifest.unlink(missing_ok=True)          # always the current client
+        manifest.unlink(missing_ok=True)
         download(STEAM_CDN + STEAM_MANIFEST, manifest)
         text = manifest.read_text()
         parts = []
@@ -222,14 +193,13 @@ def _steam(user: str):
                 raise BuildError(f"{file}: sha256 mismatch (deleted, run again)")
             with zipfile.ZipFile(z) as archive:
                 for info in archive.infolist():
-                    # the client's zips use Windows separators
                     target = steam / info.filename.replace("\\", "/")
                     if info.is_dir() or info.filename.endswith(("/", "\\")):
                         target.mkdir(parents=True, exist_ok=True)
                         continue
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(archive.read(info))
-        for path in steam.rglob("*"):          # zipfile keeps no modes: mark the programs
+        for path in steam.rglob("*"):
             if path.is_file() and not path.is_symlink():
                 with open(path, "rb") as f:
                     head = f.read(4)
@@ -251,8 +221,6 @@ def _steam(user: str):
     return hook
 
 
-# ---------------------------------------------------------------------------- session
-
 def _finish(user: str):
     def hook(root: Path) -> None:
         in_chroot(root, f"""
@@ -265,7 +233,6 @@ chown -R {user}: /home/{user}
 
 
 def layer(image: ImageConfig) -> ImageConfig:
-    """`image` with game mode added (after the TB138FC layer)."""
     user = image.account[0] if image.account else "alarm"
     return replace(
         image,

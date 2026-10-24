@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Optional desktop fonts. Each installer makes its font the default everywhere."""
 from __future__ import annotations
 
 import zipfile
@@ -13,7 +12,7 @@ from tbctl.distro.archlinux.config import ImageConfig
 D2CODING_VERSION = "1.4.0"
 D2CODING_BUILD = "20261003"
 D2CODING_FILES = (f"D2Coding-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.ttf",
-                  f"D2CodingBold-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.ttf")   # not the ligature sets
+                  f"D2CodingBold-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.ttf")
 D2CODING_URL = ("https://github.com/naver/d2-coding-font/releases/download/"
                 f"VER{D2CODING_VERSION}/D2Coding-Ver{D2CODING_VERSION}-{D2CODING_BUILD}.zip")
 
@@ -23,7 +22,6 @@ def _data(name: str) -> str:
 
 
 def install_d2coding(root: Path, cfg: ImageConfig) -> None:
-    """D2Coding for every fontconfig generic family, the GNOME UI and the GDM login screen."""
     archive = download(D2CODING_URL, cfg.cache / f"D2Coding-Ver{D2CODING_VERSION}.zip")
     fonts = root / "usr/share/fonts/d2coding"
     licenses = root / "usr/share/licenses/d2coding"
@@ -37,7 +35,6 @@ def install_d2coding(root: Path, cfg: ImageConfig) -> None:
             elif base == "OFL.txt":
                 (licenses / "OFL.txt").write_bytes(z.read(name))
     (root / "etc/fonts/local.conf").write_text(_data("d2coding/local.conf"))
-    # dconf system databases: "local" for user sessions, "gdm" for the login screen
     profile = root / "etc/dconf/profile"
     profile.mkdir(parents=True, exist_ok=True)
     (profile / "user").write_text("user-db:user\nsystem-db:local\n")

@@ -1,13 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Proprietary files from the stock ZUI 14 QFIL package (`[build] stock_firmware`) and the
-persist backup (`[build] backup`). Nothing produced here may be committed.
-
-  extract():   NON-HLOS.bin, BTFM.bin and vendor (inside super) -> <work>/stock-fw
-  stock_dt():  boot.img/dtbo.img DTBs -> <work>/stock (decompiled .dts next to each;
-               dtbo entry ovl04 is this board: "kona MTP", board-id 0x10008)
-  package():   remoteproc/GPU zap/amp firmware -> out/firmware-tb138fc.tar.gz
-  hexagonfs(): hexagonrpcd's file tree (SLPI sensors) -> out/hexagonfs-tb138fc.tar.gz
-"""
 from __future__ import annotations
 
 import shutil
@@ -18,7 +9,6 @@ from tbctl.core import android, host
 from tbctl.core.config import load
 from tbctl.core.process import BuildError, log, run
 
-# pil-squasher merges split .mdt/.bNN images into one .mbn, pinned to the revision used
 PIL_SQUASHER_URL = "https://github.com/linux-msm/pil-squasher"
 PIL_SQUASHER_REV = "3c9f8b8756ba6e4dbf9958570fd4c9aea7a70cf4"
 
@@ -28,16 +18,11 @@ HEXAGONFS_DIR = "usr/share/qcom/sm8250/Lenovo/TB138FC"
 REMOTEPROCS = ("adsp", "cdsp", "slpi", "venus")
 VENDOR_DIRS = ("firmware", "firmware_mnt", "etc/wifi", "lib/firmware")
 
-# Dynamic sensor modules (bring-to-ear, WiGig sensing; phone features): the SLPI stalls loading
-# sns_bring_to_ear.so over FastRPC and its watchdog kills the sensor process 20 s later
-# ("SEE Sensor exceeded processing time limit"), twice per boot. The SLPI re-parses the
-# configs on every boot, so their configs and registry groups go as well.
 SENSOR_DROP = {
     "sensors/config": ("kona_dynamic_sensors.json", "sns_bring_to_ear.json", "wigig_sensing_0.json"),
     "sensors/registry": ("sns_dynamic_sensors*", "sns_bring_to_ear*", "wigig_sensing*"),
     "dsp/sdsp": ("sns_bring_to_ear.so", "wigig_sensing.so"),
 }
-# /sys/devices/soc0 as Android reports it (hexagonrpcd answers the SLPI's socinfo queries)
 SOCINFO = {"hw_platform": "MTP", "platform_subtype": "Unknown", "platform_subtype_id": "0",
            "platform_version": "65536", "revision": "2.1", "soc_id": "356"}
 
@@ -58,7 +43,6 @@ def stock_fw() -> Path:
 
 
 def _tar(src: Path, out: Path, *members: str) -> None:
-    """A reproducible tarball: sorted, root-owned, fixed timestamps."""
     out.parent.mkdir(parents=True, exist_ok=True)
     run(["tar", "-C", str(src), "--sort=name", "--owner=0", "--group=0", "--numeric-owner",
          "--mtime=2021-01-01 00:00:00 UTC", "--mode=u=rwX,go=rX", "-I", "gzip -9n",
@@ -70,8 +54,6 @@ def _debugfs_rdump(image: Path, path: str, dest: Path) -> None:
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-# ---------------------------------------------------------------------------- extraction
-
 def extract() -> Path:
     host.ensure(host.require_tools(list(REQUIRED_TOOLS)))
     images = _images()
@@ -79,7 +61,6 @@ def extract() -> Path:
     shutil.rmtree(fw, ignore_errors=True)
     for d in ("modem", "bt", "vendor", "tmp"):
         (fw / d).mkdir(parents=True)
-    # FAT images: remoteproc firmware (.mdt/.bNN) and QCA6390 Bluetooth firmware
     run(["mcopy", "-s", "-n", "-i", str(images / "NON-HLOS.bin"), "::/", f"{fw / 'modem'}/"])
     run(["mcopy", "-s", "-n", "-i", str(images / "BTFM.bin"), "::/", f"{fw / 'bt'}/"])
 
@@ -102,8 +83,6 @@ def extract() -> Path:
 
 
 def stock_dt() -> Path:
-    """Split the stock DTBs (base SoC trees from boot.img, board overlays from dtbo.img) into
-    <work>/stock/{dtbs,dtbos} and decompile them."""
     host.ensure(host.require_tools(["unpack_bootimg", "dtc"]))
     images = _images()
     stock = load().work / "stock"
@@ -121,8 +100,6 @@ def stock_dt() -> Path:
                  str(path)], stdin=subprocess.DEVNULL)
     return stock
 
-
-# ---------------------------------------------------------------------------- packaging
 
 def _pil_squasher() -> Path:
     src = load().work / "pil-squasher"
@@ -153,7 +130,6 @@ def package() -> Path:
     for name in REMOTEPROCS:
         run([str(squash), str(dest / f"{name}.mbn"), str(fw / f"modem/image/{name}.mdt")])
     run([str(squash), str(dest / "a650_zap.mbn"), str(fw / "vendor/firmware/a650_zap.mdt")])
-    # Cirrus CS35L43 speaker amp DSP firmware and tunings
     cirrus = stage / "usr/lib/firmware/cirrus"
     cirrus.mkdir(parents=True)
     amp = sorted((fw / "vendor/firmware").glob("spk*-cs35l43-*"))
@@ -168,15 +144,6 @@ def package() -> Path:
 
 
 def hexagonfs() -> Path:
-    """hexagonrpcd's file tree (see hexagonrpcd(1)):
-      acdb                 <- /vendor/etc/acdbdata
-      dsp                  <- dsp partition (dspso.bin)
-      sensors/config       <- /vendor/etc/sensors/config
-      sensors/registry     <- persist /sensors/registry/registry
-      sensors/sns_reg_version <- persist (seeds the writable registry, rootfs/build/hexagonrpcd.sh)
-      sensors/sns_reg.conf <- /vendor/etc/sensors/sns_reg_config
-      socinfo              <- Android's /sys/devices/soc0 values
-    """
     host.ensure(host.require_tools(["debugfs", "tar"]))
     cfg = load()
     images = _images()
@@ -210,7 +177,7 @@ def hexagonfs() -> Path:
     for name, value in SOCINFO.items():
         (d / "socinfo" / name).write_text(value + "\n")
 
-    count = lambda p: sum(1 for f in p.rglob("*") if f.is_file())  # noqa: E731
+    count = lambda p: sum(1 for f in p.rglob("*") if f.is_file())
     log(f"dsp: {count(d / 'dsp')} files, sensors/config: {count(d / 'sensors/config')}, "
         f"registry: {count(d / 'sensors/registry')}, acdb: {count(d / 'acdb')}")
     out = cfg.out / "hexagonfs-tb138fc.tar.gz"

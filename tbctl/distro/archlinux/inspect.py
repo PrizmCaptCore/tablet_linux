@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Summarize a built image (read-only mount)."""
 from __future__ import annotations
 
 import os
@@ -13,12 +12,10 @@ from tbctl.core.chroot import loop_mounted
 def summary(root: Path) -> dict[str, str]:
     release = dict(l.split("=", 1) for l in (root / "etc/os-release").read_text().splitlines()
                    if "=" in l)
-    # local db entries are <name>-<pkgver>-<pkgrel>
     pkgs = {p.name.rsplit("-", 2)[0] for p in (root / "var/lib/pacman/local").iterdir()
             if p.is_dir()}
     units = root / "etc/systemd/system"
     enabled = sorted({p.name for p in units.glob("*.wants/*")})
-    # an absolute symlink into the image: test the link itself, not its (host) target
     if (units / "display-manager.service").is_symlink():
         enabled.append("display-manager -> " + os.readlink(units / "display-manager.service"))
     return {

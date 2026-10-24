@@ -1,9 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""The initramfs: Alpine minirootfs (busybox) + busybox-extras (telnetd, udhcpd) + small static
-helpers (initramfs/src) + initramfs/init. It mounts the Arch root or stays in a rescue shell.
-
-The archive is reproducible: pinned inputs, fixed timestamps, root ownership, sorted entries.
-"""
 from __future__ import annotations
 
 import shutil
@@ -20,14 +15,12 @@ ALPINE_BRANCH = "v3.24"
 ALPINE = f"https://dl-cdn.alpinelinux.org/alpine/{ALPINE_BRANCH}"
 MINIROOTFS = "alpine-minirootfs-3.24.2-aarch64.tar.gz"
 MINIROOTFS_URL = f"{ALPINE}/releases/aarch64/{MINIROOTFS}"
-# Alpine drops superseded package builds from its mirrors: when this 404s, take the current
-# busybox-extras version of the branch from https://pkgs.alpinelinux.org/packages
 BUSYBOX_EXTRAS = "busybox-extras-1.37.0-r31.apk"
 BUSYBOX_EXTRAS_URL = f"{ALPINE}/main/aarch64/{BUSYBOX_EXTRAS}"
 
-HELPERS = ("rebootmode", "devmem")      # initramfs/src/<name>.c -> /bin/<name>
+HELPERS = ("rebootmode", "devmem")
 INIT = DATA / "initramfs" / "init"
-MTIME = "2021-01-01 00:00:00 UTC"       # every entry gets this timestamp
+MTIME = "2021-01-01 00:00:00 UTC"
 
 REQUIRED_TOOLS = ("tar", "cpio", "gzip", "touch", "aarch64-linux-gnu-gcc")
 
@@ -54,9 +47,8 @@ def build() -> Path:
     shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir(parents=True)
     run(["tar", "-xzf", str(rootfs), "-C", str(stage)])
-    # an .apk is concatenated gzip streams: signature, control (.PKGINFO), data
     run(["tar", "-xzf", str(extras), "-C", str(stage), "--exclude=.*"], check=False,
-        stderr=subprocess.DEVNULL)   # tar complains about the trailing streams
+        stderr=subprocess.DEVNULL)
     if not (stage / "usr/bin/busybox-extras").exists() and not (stage / "bin/busybox-extras").exists():
         raise BuildError(f"busybox-extras missing after unpacking {extras.name}")
     for name in HELPERS:
@@ -68,7 +60,6 @@ def build() -> Path:
     run(["find", str(stage), "-exec", "touch", "-h", "-d", MTIME, "{}", "+"])
     out = cfg.out / "initramfs.cpio.gz"
     out.parent.mkdir(parents=True, exist_ok=True)
-    # sorted names, root:root, no inode numbers / timestamps beyond MTIME, no gzip name/time
     run(["sh", "-c", "find . -mindepth 1 | LC_ALL=C sort | "
          "cpio -o -H newc --quiet --reproducible -R 0:0 | gzip -9 -n > \"$0\"", str(out)],
         cwd=stage)

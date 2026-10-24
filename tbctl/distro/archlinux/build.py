@@ -1,9 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-"""Assemble the image: base tarball -> pacman (GNOME) -> system settings -> fonts -> layers.
-
-Runs on Linux (WSL works) as root; packages are installed by the image's own pacman in a
-chroot, so an x86 host needs qemu-user with binfmt_misc.
-"""
 from __future__ import annotations
 
 import shutil
@@ -38,7 +33,6 @@ def fetch_base(cache: Path) -> Path:
     md5 = download(ALARM_URL + ".md5", cache / "ArchLinuxARM-aarch64-latest.tar.gz.md5")
     expected = md5.read_text().split()[0]
     if file_digest(tarball, "md5") != expected:
-        # a stale cached tarball against a newer .md5 (or a corrupt download): refetch both
         tarball.unlink()
         md5.unlink()
         raise BuildError("base tarball md5 mismatch (cache cleared, run again)")
@@ -78,8 +72,6 @@ usermod -aG wheel alarm
 
 
 def set_account(root: Path, name: str, password: str) -> None:
-    """Replace the stock alarm account; root gets the same password. The password goes in on
-    stdin (chpasswd), so only its hash lands in the image."""
     if not name.replace("-", "").replace("_", "").isalnum() or ":" in password or "\n" in password:
         raise BuildError(f"unusable account name or password for {name!r}")
     in_chroot(root, f"""
@@ -125,10 +117,8 @@ def build(cfg: ImageConfig) -> None:
                 apply_layers(root, cfg)
                 for hook in cfg.hooks:
                     hook(root)
-                # after the layers: they may ship some of the units
                 in_chroot(root, "systemctl enable " + " ".join(
                     [cfg.display_manager, *BASE_SERVICES, *cfg.services]))
-            # systemd-resolved is enabled: point at its stub (the tarball links resolv.conf)
             resolv = root / "etc/resolv.conf"
             resolv.unlink(missing_ok=True)
             resolv.symlink_to("/run/systemd/resolve/stub-resolv.conf")
