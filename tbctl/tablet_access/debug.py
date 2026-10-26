@@ -27,6 +27,20 @@ def display_registers(output: Path) -> int:
     return rc
 
 
+def memory(action: str, appid: str, interval: float, output: Path) -> int:
+    with Session() as s:
+        s.put(_script("memtrack.py"), "/var/tmp/memtrack.py")
+        cmd = ["python3", "/var/tmp/memtrack.py", action]
+        rc = s.run(" ".join(cmd + ([appid, str(interval)] if action == "start" else [])),
+                   timeout=24 * 3600 if action == "watch" else 600)
+        if action == "start" and rc == 0:
+            print(f"sampling every {interval:g}s (AppId {appid}); run `tbctl debug mem stop` after playing")
+        if action == "stop" and rc == 0:
+            s.get("/var/tmp/memtrack.csv", output)
+            print(f"-> {output}")
+        return rc
+
+
 def gpu_status() -> int:
     with Session() as s:
         return run_script(s, "gpu-check.sh")

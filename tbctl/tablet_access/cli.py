@@ -121,5 +121,12 @@ def register(sub: argparse._SubParsersAction) -> None:
     dr = dcmds.add_parser("regs", help="dump display-path registers")
     dr.add_argument("-o", "--output", type=Path, default=Path("disp-regs.txt"))
     dr.set_defaults(func=lambda args: debug.display_registers(args.output))
+    dm = dcmds.add_parser("mem", help="track memory use while a Steam game runs")
+    dm.add_argument("action", choices=("start", "status", "watch", "stop"))
+    dm.add_argument("--appid", default="418370", help="Steam AppId (default: Resident Evil 7)")
+    dm.add_argument("--interval", type=float, default=2)
+    dm.add_argument("-o", "--output", type=Path, default=Path("memtrack.csv"))
+    dm.set_defaults(func=lambda args: debug.memory(args.action, args.appid, args.interval,
+                                                   args.output))
     dg = dcmds.add_parser("gpu", help="is GNOME rendering on the GPU?")
     dg.set_defaults(func=lambda args: debug.gpu_status())

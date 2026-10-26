@@ -1,2 +1,2 @@
 # QCA6390 Bluetooth needs its BD address after every probe (boot or watchdog recovery)
-SUBSYSTEM=="bluetooth", KERNEL=="hci0", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}+="tb138fc-bt-addr.service"
+SUBSYSTEM=="bluetooth", KERNEL=="hci[0-9]*", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}+="tb138fc-bt-addr.service"

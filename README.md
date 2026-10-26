@@ -21,7 +21,7 @@
 ### 2. Set up tbctl
 
 ```bash
-pip install -e .                       # installs the `tbctl` command (or use `python -m tbctl`)
+pip install -e .                       # installs the `tbctl` command (or use `python -m tbctl`) 
 cp config.example.toml config.toml     # then set [build] stock_firmware and backup
 tbctl doctor                           # checks paths, host tools and qemu, per build step
 ```

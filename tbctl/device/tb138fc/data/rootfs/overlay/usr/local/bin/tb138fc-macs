@@ -4,8 +4,8 @@
 #   fpinfo+0xa0  "D8:63:0D:xx:xx:xx"  Bluetooth
 #   fpinfo+0xc0  "D8:63:0D:xx:xx:xx"  Wi-Fi
 # Without a BD address the QCA6390 stays an "unconfigured controller" and bluetoothd ignores it.
-#   tb138fc-macs [bt|wifi]   (default: both). "bt" runs from udev whenever hci0 appears, so a
-#   re-probed controller (tb138fc-bt-watchdog) gets its address back too.
+#   tb138fc-macs [bt|wifi]   (default: both). "bt" runs from udev whenever a controller appears,
+#   so a re-probed one (tb138fc-bt-watchdog; it comes back as hci1, hci2, ...) gets it back too.
 
 # The QCA6390 has no address in its OTP: ath11k makes up a new permanent one (00:03:7F:12:xx:xx)
 # on every boot. GNOME and Steam pin saved Wi-Fi networks to the permanent address, so after a
@@ -30,12 +30,14 @@ wifi=$(read_mac 0xc0)
 if [ "${1:-bt}" != wifi ] && valid "$bt"; then
 	# hci0 shows up before the QCA firmware download finishes (~6 s after boot); the address
 	# can only be set once it is listed as an unconfigured controller
+	idx=
 	for i in $(seq 1 60); do
-		btmgmt config 2>/dev/null | grep -q 'Unconfigured controller' && break
+		idx=$(btmgmt config 2>/dev/null | sed -n 's/^hci\([0-9]*\):.*Unconfigured controller.*/\1/p' | head -1)
+		[ -n "$idx" ] && break
 		bluetoothctl show 2>/dev/null | grep -qi "Controller $bt" && exit 0
 		sleep 0.5
 	done
-	btmgmt --index 0 public-addr "$bt" >/dev/null && echo "bluetooth address $bt"
+	[ -n "$idx" ] && btmgmt --index "$idx" public-addr "$bt" >/dev/null && echo "bluetooth address set on hci$idx"
 fi
 
 if [ "${1:-wifi}" != bt ] && valid "$wifi"; then
